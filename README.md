@@ -17,7 +17,7 @@ When using Colab, teammates do **not** need to install CUDA or DiffVG manually o
 
 ## Quick start
 
-1. Open the notebook using [Open in Colab](https://colab.research.google.com/github/ArmitaAfr/Visibility_Thresholds/blob/main/clipdraw.ipynb). If the repository is not yet available on its default branch, open Colab, choose **File → Upload notebook**, and upload `clipdraw.ipynb`.
+1. Open the notebook using [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArmitaAfr/Visibility_Thresholds/blob/feature/clipdraw-cleanup/clipdraw.ipynb). If the repository is not yet available on its default branch, open Colab, choose **File → Upload notebook**, and upload `clipdraw.ipynb`.
 2. In Colab, select **Runtime → Change runtime type**, choose a **GPU** hardware accelerator, and reconnect.
 3. Run the environment setup and runtime verification cells. The first setup compiles DiffVG and may take several minutes.
 4. In **Experiment configuration**, start with:
