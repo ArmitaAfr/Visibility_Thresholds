@@ -1,0 +1,57 @@
+# Words removed by the `vulgar` cleaning rule in build_dataset.py.
+# One word per line; lines starting with # are comments. Edit this file and rerun the script to change the list.
+# Candidates were found by checking the cleaned words against the LDNOOBW English list
+# (https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words, CC BY 4.0)
+# and by a manual search of word stems, then reviewed by hand.
+
+# Profanity and insults
+asshole
+bastard
+bitch
+bitchy
+crap
+cunt
+fucker
+motherfucker
+shit
+sissy
+wanker
+whore
+
+# Explicit sexual terms
+bondage
+dildo
+erotic
+intercourse
+kinky
+masturbate
+masturbation
+nude
+orgasm
+pervert
+pimp
+prostitute
+sexual
+sexy
+stripper
+
+# Sexual anatomy
+anus
+nipple
+penis
+sperm
+vagina
+
+# Sexual violence
+incest
+rape
+rapist
+
+# Crude bodily terms
+butt
+fart
+
+# Words for obscenity itself
+obscene
+obscenity
+vulgar

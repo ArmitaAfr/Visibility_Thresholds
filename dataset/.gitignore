@@ -1,0 +1,6 @@
+# Generated outputs (rebuild with build_dataset.py)
+/processed/*.csv
+!/processed/sampled_words.csv
+/processed/build_report.json
+# Experiment runs written to subfolders, e.g. --output-dir dataset/processed/seed7
+/processed/*/
