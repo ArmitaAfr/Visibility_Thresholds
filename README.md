@@ -2,7 +2,7 @@
 
 ## Project overview
 
-[QMIND](https://qmind.ca/) is Queen's University's student-run artificial intelligence organization. **Visibility Thresholds: The Shape a Thought Needs** investigates whether high CLIP text-image similarity corresponds to visual concepts that people can genuinely recognize, and how that relationship changes across image substrates.
+**Visibility Thresholds: The Shape a Thought Needs** investigates whether high CLIP text-image similarity corresponds to visual concepts that people can genuinely recognize, and how that relationship changes across image substrates.
 
 [`clipdraw.ipynb`](clipdraw.ipynb) covers the project's **vector-stroke substrate**. It uses CLIPDraw to optimize coloured Bézier curves against a text prompt, producing a simple vector drawing without training a new model. This notebook is one experimental component, not the project's complete research or human-evaluation pipeline.
 
