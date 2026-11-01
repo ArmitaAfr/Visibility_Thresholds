@@ -6,6 +6,15 @@
 
 [`clipdraw.ipynb`](clipdraw.ipynb) covers the project's **vector-stroke substrate**. It uses CLIPDraw to optimize coloured Bézier curves against a text prompt, producing a simple vector drawing without training a new model. This notebook is one experimental component, not the project's complete research or human-evaluation pipeline.
 
+## Repository contents
+
+| Path | What it is |
+| --- | --- |
+| [`clipdraw.ipynb`](clipdraw.ipynb) | Vector-stroke substrate: CLIPDraw optimization of Bézier strokes against a text prompt. |
+| [`dataset/`](dataset/) | Word stimuli: 150 nouns sampled at low, medium, and high imageability from the Glasgow Norms, cleaned with Brysbaert concreteness ratings and SUBTLEX-US part of speech. See [`dataset/README.md`](dataset/README.md). |
+
+The official stimulus list is [`dataset/processed/sampled_words.csv`](dataset/processed/sampled_words.csv). Rebuild it with `python3 dataset/build_dataset.py`.
+
 ## Requirements
 
 - A Google account with access to [Google Colab](https://colab.research.google.com/).
@@ -17,7 +26,7 @@ When using Colab, teammates do **not** need to install CUDA or DiffVG manually o
 
 ## Quick start
 
-1. Open the notebook using [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArmitaAfr/Visibility_Thresholds/blob/feature/clipdraw-cleanup/clipdraw.ipynb). If the repository is not yet available on its default branch, open Colab, choose **File → Upload notebook**, and upload `clipdraw.ipynb`.
+1. Open the notebook using [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArmitaAfr/Visibility_Thresholds/blob/main/clipdraw.ipynb).
 2. In Colab, select **Runtime → Change runtime type**, choose a **GPU** hardware accelerator, and reconnect.
 3. Run the environment setup and runtime verification cells. The first setup compiles DiffVG and may take several minutes.
 4. In **Experiment configuration**, start with:
