@@ -115,8 +115,24 @@ def clean(merged, glasgow, args):
     return cleaned.reset_index(drop=True), removed
 
 
+def pos_words(cleaned, args):
+    """Every cleaned word with the sampled part of speech, ordered by imageability group."""
+    words = cleaned.loc[cleaned["pos"].eq(args.sample_pos)]
+    return words.sort_values(["score_bin", "word"]).reset_index(drop=True)
+
+
+def split_pool(pool, args):
+    """Shuffle each imageability group and cut it into equal halves: low -> 1, 2; medium -> 3, 4; ..."""
+    parts = []
+    for interval in pool["score_bin"].cat.categories:
+        group = pool.loc[pool["score_bin"] == interval].sample(frac=1, random_state=args.seed)
+        half = (len(group) + 1) // 2
+        parts += [group.iloc[:half], group.iloc[half:]]
+    return [part.sort_values("word").reset_index(drop=True) for part in parts]
+
+
 def sample(cleaned, args):
-    candidates = cleaned.loc[cleaned["pos"].eq(args.sample_pos)]
+    candidates = pos_words(cleaned, args)
     parts = []
     bin_counts = {}
     for interval in cleaned["score_bin"].cat.categories:
@@ -146,12 +162,15 @@ def build_dataset(args):
 
     merged = merge_sources(glasgow, ratings, pos)
     cleaned, removed = clean(merged, glasgow, args)
+    pool = pos_words(cleaned, args)
     sampled, bin_counts = sample(cleaned, args)
+    pool_name = f"{args.sample_pos.lower()}_words"
+    splits = split_pool(pool, args)
 
     report = {
         "counts": {"glasgow_raw": len(glasgow_raw), "ratings_raw": len(ratings_raw),
                    "pos_raw": len(pos_raw), "merged": len(merged), "cleaned": len(cleaned),
-                   "sampled": len(sampled)},
+                   pool_name: len(pool), "sampled": len(sampled)},
         "removed": removed,
         "cleaned_pos": {str(key): int(value) for key, value in
                         cleaned["pos"].fillna("missing").value_counts().items()},
@@ -167,8 +186,14 @@ def build_dataset(args):
                        "seed": args.seed, "pandas_version": pd.__version__},
     }
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    for name, frame in [("cleaned", cleaned), ("sampled", sampled)]:
-        frame.to_csv(args.output_dir / f"{name}_words.csv", index=False)
+    for name, frame in [("cleaned_words", cleaned), (pool_name, pool), ("sampled_words", sampled)]:
+        frame.to_csv(args.output_dir / f"{name}.csv", index=False)
+    split_dir = args.output_dir / f"{pool_name}_split"
+    split_dir.mkdir(exist_ok=True)
+    for number, frame in enumerate(splits, start=1):
+        frame.to_csv(split_dir / f"{number}.csv", index=False)
+    report["splits"] = {str(number): {"score_bin": str(frame["score_bin"].iloc[0]), "words": len(frame)}
+                        for number, frame in enumerate(splits, start=1)}
     (args.output_dir / "build_report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"
     )

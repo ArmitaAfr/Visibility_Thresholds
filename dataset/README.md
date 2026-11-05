@@ -2,11 +2,13 @@
 
 `build_dataset.py` builds the word stimuli for studying how a word's **imageability** relates to whether people can recognize the drawing generated for it.
 
-It produces two word lists:
+It produces these outputs:
 
 | Output | Rows | What it is |
 | --- | --- | --- |
 | `processed/cleaned_words.csv` | 3,940 | Every word that is in both norm datasets and passes cleaning. All norm columns plus part of speech. Use this to draw new samples or for analysis. |
+| `processed/noun_words.csv` | 2,476 | **The full noun dataset**: every cleaned word whose part of speech is `Noun`, with its imageability group (`score_bin`) and sorted by group then word. The 150 stimuli are drawn from this list. |
+| `processed/noun_words_split/1.csv` … `6.csv` | 107 / 107 / 430 / 430 / 701 / 701 | `noun_words.csv` split in six: each imageability group is shuffled (seed `42`) and cut in half. Low → 1, 2; medium → 3, 4; high → 5, 6. Every noun appears in exactly one file. |
 | `processed/sampled_words.csv` | 150 | **The experiment stimuli**: 50 nouns each with low, medium, and high imageability. |
 | `processed/build_report.json` | — | Record of the build: counts at every step, what each cleaning rule removed (with examples), and all parameters. |
 
@@ -36,7 +38,8 @@ Rerunning with the same inputs and parameters reproduces identical files.
 flowchart LR
     G[glasgow.csv<br/>5,553] --> M
     R[ratings.csv<br/>39,954] --> M
-    M[1. Merge<br/>4,456] --> C[2. Clean<br/>3,940] --> S[3. Sample nouns<br/>150]
+    M[1. Merge<br/>4,456] --> C[2. Clean<br/>3,940] --> N[3. Keep nouns<br/>2,476] --> S[4. Sample<br/>150]
+    N --> X[5. Split<br/>6 files]
     P[subtlex_pos.csv<br/>74,286] -. part of speech .-> M
 ```
 
@@ -61,9 +64,13 @@ Rules are applied in this order; each word is counted under the first rule that 
 
 **3,940** words remain. `build_report.json` lists the removal counts and examples from the latest build.
 
-### 3. Sample
+### 3. Keep nouns
 
-The cleaned words are grouped by Glasgow imageability (1–7 scale), and 50 **nouns** are drawn at random from each group (seed `42`):
+Only cleaned words whose dominant SUBTLEX-US part of speech is `Noun` are kept, giving **2,476** words in `noun_words.csv`, each labelled with its imageability group (Glasgow, 1–7 scale). `cleaned_words.csv` still contains every part of speech.
+
+### 4. Sample
+
+50 nouns are drawn at random from each imageability group (seed `42`):
 
 | Group | Imageability | Cleaned words | Nouns available | Sampled |
 | --- | --- | --- | --- | --- |
@@ -79,9 +86,24 @@ Example sampled words:
 - **Medium:** amount, beauty, health, signal, trade
 - **High:** crocodile, notebook, phone, pineapple, scientist
 
+### 5. Split
+
+All 2,476 nouns in `noun_words.csv` are also split into six files in `noun_words_split/`. Each imageability group is shuffled (seed `42`) and cut into two equal halves, so each file holds a single group:
+
+| File | Group | Imageability | Words |
+| --- | --- | --- | --- |
+| `1.csv` | Low | `[1, 3]` | 107 |
+| `2.csv` | Low | `[1, 3]` | 107 |
+| `3.csv` | Medium | `(3, 5]` | 430 |
+| `4.csv` | Medium | `(3, 5]` | 430 |
+| `5.csv` | High | `(5, 7]` | 701 |
+| `6.csv` | High | `(5, 7]` | 701 |
+
+Every noun appears in exactly one file. Words within a file are sorted alphabetically. The split is independent of step 4, so the 150 sampled words are spread across these files too. `build_report.json` records each file's group and word count under `splits`.
+
 ## Output columns
 
-Both CSVs have the same columns, one row per word.
+All output CSVs have the same columns, one row per word.
 
 | Columns | Meaning |
 | --- | --- |
@@ -107,7 +129,7 @@ Both CSVs have the same columns, one row per word.
 | `--min-subtlex` | `10` | Minimum `SUBTLEX` count |
 | `--bin-edges` | `1 3 5 7` | Imageability group boundaries |
 | `--per-bin` | `50` | Words sampled per group |
-| `--sample-pos` | `Noun` | Part of speech to sample |
+| `--sample-pos` | `Noun` | Part of speech to keep and sample. The kept list is written to `<pos>_words.csv` (default `noun_words.csv`) |
 | `--seed` | `42` | Random seed |
 
 
@@ -134,7 +156,7 @@ Two settings must be changed manually:
 - **Part of speech comes from subtitles and can be imperfect.** Only words tagged `Noun` are sampled. Words tagged `Name` are excluded even when they are common nouns (e.g. armadillo, buffalo), because the tag also covers surnames such as baker or brown. A few tags are surprising (e.g. `dopey` is tagged `Noun`).
 - **The ambiguity rule is strict.** It removes every word Glasgow rates by sense, including words with one dominant meaning such as `apple` (Glasgow also rates `Apple (brand)`).
 - **The vulgar-word list is hand-curated.** It was built by checking the cleaned words against the [LDNOOBW](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words) English list (CC BY 4.0) and searching word stems, then reviewing by hand. Borderline words such as `breast`, `naked`, `mistress`, and `seduction` are kept, as are negative but not vulgar words such as `killer` or `heroin`. Edit `vulgar_words.txt` and rerun to change it.
-- `sampled_words.csv` is the fixed stimulus list and is tracked in Git. `cleaned_words.csv` and `build_report.json` are regenerated by the script.
+- `sampled_words.csv` (the fixed stimulus list), `noun_words.csv` (the full noun dataset), and `noun_words_split/` are tracked in Git. `cleaned_words.csv` and `build_report.json` are regenerated by the script.
 
 ## References
 
