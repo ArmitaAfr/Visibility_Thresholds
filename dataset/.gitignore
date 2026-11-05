@@ -5,3 +5,4 @@
 /processed/build_report.json
 # Experiment runs written to subfolders, e.g. --output-dir dataset/processed/seed7
 /processed/*/
+!/processed/noun_words_split/

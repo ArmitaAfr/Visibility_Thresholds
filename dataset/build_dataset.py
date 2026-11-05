@@ -121,6 +121,16 @@ def pos_words(cleaned, args):
     return words.sort_values(["score_bin", "word"]).reset_index(drop=True)
 
 
+def split_pool(pool, args):
+    """Shuffle each imageability group and cut it into equal halves: low -> 1, 2; medium -> 3, 4; ..."""
+    parts = []
+    for interval in pool["score_bin"].cat.categories:
+        group = pool.loc[pool["score_bin"] == interval].sample(frac=1, random_state=args.seed)
+        half = (len(group) + 1) // 2
+        parts += [group.iloc[:half], group.iloc[half:]]
+    return [part.sort_values("word").reset_index(drop=True) for part in parts]
+
+
 def sample(cleaned, args):
     candidates = pos_words(cleaned, args)
     parts = []
@@ -155,6 +165,7 @@ def build_dataset(args):
     pool = pos_words(cleaned, args)
     sampled, bin_counts = sample(cleaned, args)
     pool_name = f"{args.sample_pos.lower()}_words"
+    splits = split_pool(pool, args)
 
     report = {
         "counts": {"glasgow_raw": len(glasgow_raw), "ratings_raw": len(ratings_raw),
@@ -177,6 +188,12 @@ def build_dataset(args):
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for name, frame in [("cleaned_words", cleaned), (pool_name, pool), ("sampled_words", sampled)]:
         frame.to_csv(args.output_dir / f"{name}.csv", index=False)
+    split_dir = args.output_dir / f"{pool_name}_split"
+    split_dir.mkdir(exist_ok=True)
+    for number, frame in enumerate(splits, start=1):
+        frame.to_csv(split_dir / f"{number}.csv", index=False)
+    report["splits"] = {str(number): {"score_bin": str(frame["score_bin"].iloc[0]), "words": len(frame)}
+                        for number, frame in enumerate(splits, start=1)}
     (args.output_dir / "build_report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"
     )
