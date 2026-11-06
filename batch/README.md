@@ -26,64 +26,40 @@ The drawing code is the same as notebook Sections 5–7: same optimizer, learnin
 
 Before anyone starts a full run, **agree on the settings** (prompt template, negative prompts, iterations, strokes). Every part must use the same settings or the results aren't comparable.
 
-## Running your part (Google Colab)
+## Every session: integrated notebook workflow
 
-1. Open `clipdraw.ipynb` in Colab and select **Runtime → Change runtime type → GPU**.
-2. Run notebook **Sections 1–4** (setup, runtime check, settings, CLIP and helpers). Skip Sections 5–8.
-3. Add a cell to get the repo and load the batch code:
+No setup cells need to be pasted. Use the **Batch Experiment Setup** section in the original [`clipdraw.ipynb`](../clipdraw.ipynb).
 
-   ```python
-   ![ -d /content/Visibility_Thresholds ] || git clone https://github.com/ArmitaAfr/Visibility_Thresholds.git /content/Visibility_Thresholds
-   %cd /content/Visibility_Thresholds
-   %run -i batch/load_words.py
-   %run -i batch/batch_runner.py
-   ```
+1. Open the notebook in Colab and select a GPU runtime. Run original **Sections 1-4** in order, leaving generation settings at the agreed team values. Sections 5-8 are for single images only.
+2. In **Batch Experiment Setup**, set `WORKFLOW = "batch"`. In that same configuration cell, set `PERSON` to your agreed 1-based number, `NUM_PEOPLE` to the team size, `RUN_MODE = "smoke_test"`, `WORDS_SOURCE` to the ordered CSV path/URL, and `OUTPUT_ROOT` to your part's destination. The default relative source is the official stimulus list; the default destination uses a generic `clipdraw_results` folder/shortcut in My Drive with separate `smoke_partN` and `partN` folders. There is no preassigned person.
+3. For Drive output, set `MOUNT_DRIVE = True` and run the optional mounting cell (or mount Drive beforehand). Use the shared folder setup above. Local `/content` storage will be lost if the runtime is deleted.
+4. Run **Load existing batch scripts and assign words**. It reuses a complete checkout or clones the team repository automatically, executes the existing scripts in the notebook namespace, loads the CSV, and prints `words[PERSON - 1::NUM_PEOPLE]`. Review the assignment and output path.
+5. Run **Run or resume the batch**. It calls the existing `batch_run()` with `skip_existing=True` and prediction disabled. The original single-image cells are guarded and do nothing in batch mode.
+6. After checking the smoke outputs, change `RUN_MODE` to `"full"` in the batch configuration and rerun the configuration, mount, loader, and execution cells. The default output expression changes to `partN`; if you customized it, use a separate destination for the full experiment.
+7. Disconnect/delete the GPU runtime when finished. To use the single-image workflow instead, run Sections 3-4 again, select `WORKFLOW = "single"`, and continue with Sections 5-8. Avoid **Run all** until you have reviewed the workflow selection.
 
-   `%run -i` lets the batch code use the model and helpers from Sections 1–4. (Pasting each file into its own cell also works.)
-
-4. Add the run cell. Set `PERSON` to your number. Run it once with `RUN_MODE = "smoke_test"` (under a second per word) to check your setup, then change to `"full"` and run it again.
-
-   ```python
-   from google.colab import drive
-   drive.mount("/content/drive")
-
-   PERSON = 1            # 1, 2, 3 or 4: each teammate uses a different number
-   NUM_PEOPLE = 4
-
-   WORDS_SOURCE = "/content/Visibility_Thresholds/dataset/processed/sampled_words.csv"
-   SHARED_ROOT = "/content/drive/MyDrive/clipdraw_results"
-   PROMPT_TEMPLATE = "A drawing of {}."
-   RUN_MODE = "smoke_test"                                  # then "full"
-
-   OUTPUT_ROOT = f"{SHARED_ROOT}/part{PERSON}" if RUN_MODE == "full" else f"{SHARED_ROOT}/smoke_part{PERSON}"
-   words = load_words(WORDS_SOURCE)
-   my_words = words[PERSON - 1::NUM_PEOPLE]                 # interleaved: everyone gets a mix of the list
-   print(f"Part {PERSON}: {len(my_words)} words")
-
-   results = batch_run(my_words, prompt_template=PROMPT_TEMPLATE,
-                       run_mode=RUN_MODE, output_root=OUTPUT_ROOT)
-   ```
-
-5. When your part finishes, **remove or disconnect the runtime** so it stops using your allowance.
+The batch configuration overrides Section 3's `RUN_MODE` only for batches; all other drawing settings still come from Sections 3-4. Keep the prompt template and generation settings consistent across teammates. No additional judge models are loaded.
 
 ## If you get disconnected
 
-- Everything finished is already saved in Drive. If one word fails, it's logged as `error` in the summary and the batch continues.
-- To resume: reconnect, rerun Sections 1–4, the batch code cell and the run cell (with the same `PERSON` and `RUN_MODE`). Finished words are skipped and the run continues from the next one. Words that failed are retried.
-- If `OUTPUT_ROOT` points into Drive but Drive isn't mounted, `batch_run` stops before drawing anything, so results can't end up in temporary storage.
-- Before resuming, check your `partN` folder in Drive: if new word folders are still appearing, the run is still going, so don't start a second copy.
+- Reconnect to a GPU runtime and rerun Sections 1-4, then the batch configuration, optional Drive mount, loader, and execution cells.
+- Restore exactly the same `PERSON`, `NUM_PEOPLE`, CSV contents/order, `RUN_MODE`, `OUTPUT_ROOT`, prompt template, and generation settings. Changing the split/order changes indexed word folder names and can cause words to be regenerated.
+- `skip_existing=True` skips a word when its indexed output folder contains `experiment.json`, the existing runner's completion marker. Completed PNG/SVG files in those folders are left untouched. Failed or interrupted words without that marker are retried and their partial files may be replaced.
+- A fresh experiment or changed settings require a new output root. Smoke and full outputs must use separate folders.
+- Drive output requires mounted Drive; the runner stops before drawing if it is not mounted. Confirm that another runtime is not still writing to your part before resuming.
 
 ## Combining everyone's results
 
-When all parts are done, one person runs (after steps 2–3 above, so the batch code is loaded):
+When all parts are done, one person runs this after the integrated batch loader cell (which defines `REPO_ROOT`):
 
 ```python
 from google.colab import drive
 drive.mount("/content/drive")
 
-WORDS_SOURCE = "/content/Visibility_Thresholds/dataset/processed/sampled_words.csv"
+WORDS_SOURCE = str(REPO_ROOT / "dataset/processed/sampled_words.csv")
 OUTPUT_ROOT = "/content/drive/MyDrive/clipdraw_results"
-%run -i batch/results_cell.py
+results_script = REPO_ROOT / "batch/results_cell.py"
+exec(compile(results_script.read_text(encoding="utf-8"), str(results_script), "exec"), globals())
 ```
 
 The results cell finds every `part*` folder, combines their summaries into `batch_summary_all.csv`, joins each word with its scores from the word list (concreteness, imageability, `score_bin`, …) and saves **`clipdraw_results/results_with_scores.csv`**. Pointing `OUTPUT_ROOT` at a single `partN` folder gives results for just that part.

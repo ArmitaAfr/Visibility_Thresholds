@@ -37,10 +37,16 @@ When using Colab, teammates do **not** need to install CUDA or DiffVG manually o
    ENABLE_PREDICTION = False
    ```
 
-5. Run the remaining cells from top to bottom. Confirm that optimization finishes and displays the final drawing.
+5. Select `WORKFLOW = "single"` (the default) in **Batch Experiment Setup**, then run original Sections 5-8. Confirm that optimization finishes and displays the final drawing.
 6. For a baseline research run, change `RUN_MODE` to `"full"` and rerun from the configuration cell through export. Full mode uses 256 paths, 1,000 iterations, and four augmentations.
 7. To inspect the optional CLIP labels, set `ENABLE_PREDICTION = True`; otherwise leave it off.
 8. In the final cell, use the generated links to download the PNG, SVG, and JSON files from `/content/clipdraw_output` before disconnecting.
+
+## Batch experiments
+
+The original notebook now includes **Batch Experiment Setup** after Sections 1-4. Select `WORKFLOW = "batch"`, configure your team number, team size, mode, CSV source and output folder there, mount Drive if needed, then run the loader and batch execution cells. The loader locates or clones this repository and uses the existing batch scripts. Single-image Sections 5-8 are guarded in batch mode.
+
+Start with `smoke_test`, then use `full` in a separate output folder. To resume, rerun Sections 1-4 and the batch cells with the same assignment, dataset order, settings and output folder. `skip_existing=True` preserves word folders containing `experiment.json`. See [the batch instructions](batch/README.md) for exact steps and shared Drive setup.
 
 ## Configuration reference
 
