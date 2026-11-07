@@ -1,0 +1,6 @@
+# Isolated Python 3.12.10; install the matching cu124 torch pair first.
+-r requirements-siglip2.txt
+torch==2.6.0
+torchvision==0.21.0
+transformers==5.3.0
+pillow==11.3.0

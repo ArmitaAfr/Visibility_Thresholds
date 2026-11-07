@@ -1,0 +1,5 @@
+torch>=2.6,<3
+transformers>=4.50,<6
+pillow>=10,<13
+sentencepiece>=0.2,<0.3
+protobuf>=4,<8
