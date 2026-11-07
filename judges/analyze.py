@@ -14,12 +14,15 @@ def main(argv=None):
                         help="Optional relocated batch roots, verified using stable image IDs.")
     parser.add_argument("--allow-unmatched", action="store_true",
                         help="Analyze the ID intersection and explicitly report omitted records.")
+    parser.add_argument("--imageability-metadata", type=Path,
+                        help="Opt in to strict imageability joins/strata using the dataset word/score_bin/glasgow_imageability_mean columns.")
     parser.add_argument("--output-dir", type=Path, required=True, help="New directory; existing reports are never overwritten.")
     args = parser.parse_args(argv)
     if args.output_dir.exists():
         parser.error("--output-dir already exists; choose a new directory.")
     rows, summary = analyze_exports(args.siglip2, args.florence2,
-                                   source_roots=args.source_root, allow_unmatched=args.allow_unmatched)
+                                   source_roots=args.source_root, allow_unmatched=args.allow_unmatched,
+                                   imageability_source=args.imageability_metadata)
     write_report(rows, summary, args.output_dir)
     print(f"Compared {len(rows)} verified images; vocabulary={summary['siglip2']['vocabulary_size']}. Report: {args.output_dir}")
 

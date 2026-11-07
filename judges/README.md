@@ -1,4 +1,8 @@
-# Judge evaluation pipeline (Phases 1-5)
+# Judge evaluation pipeline (Phases 1-6)
+
+For optional low/medium/high imageability summaries from existing judge exports,
+see [Phase 6 stratified analysis](analysis/README.md#phase-6-imageability-stratified-analysis).
+It reuses the dataset's recorded labels/scores and retains overall metrics.
 
 For independent Google Drive evaluation, benchmarks and 2,000+ image job
 preparation, use [the separate Colab workflow](COLAB.md) and

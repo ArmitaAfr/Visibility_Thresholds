@@ -159,6 +159,24 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(len(summary["inputs"]["siglip2"]), 2)
         self.assertEqual(summary["siglip2"]["top1_target_hits"], 1)
 
+    def test_opt_in_stratification_preserves_overall_and_enriches_cli_outputs(self):
+        metadata = self.root / "imageability.csv"
+        metadata.write_text('word,score_bin,glasgow_imageability_mean\ncat,"[1, 3]",2\ndog,"(3, 5]",4\nidea,"(5, 7]",6\n')
+        original_rows, original_summary = self.analyze()
+        rows, summary = self.analyze(imageability_source=metadata)
+        for key, value in original_summary.items():
+            self.assertEqual(summary[key], value)
+        for original, enriched in zip(original_rows, rows):
+            self.assertEqual(original, {key: enriched[key] for key in original})
+        out = self.root / "stratified-report"
+        main(["--siglip2", str(self.sig_path), "--florence2", str(self.flo_path),
+              "--imageability-metadata", str(metadata), "--output-dir", str(out)])
+        with (out / "comparison.csv").open(newline="", encoding="utf-8") as handle:
+            table = list(csv.DictReader(handle))
+        self.assertEqual({row["imageability_group"] for row in table}, {"low", "medium", "high"})
+        self.assertEqual(len(json.loads((out / "summary.json").read_text())["imageability"]["groups"]), 3)
+        self.assertIn("Median rank", (out / "report.md").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

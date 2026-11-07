@@ -91,7 +91,8 @@ def _siglip_prediction(row):
     return words, size, vocabulary_hash
 
 
-def analyze_exports(siglip_paths, florence_paths, *, source_roots=None, allow_unmatched=False):
+def analyze_exports(siglip_paths, florence_paths, *, source_roots=None, allow_unmatched=False,
+                    imageability_source=None):
     """Return combined rows and a deterministic summary; never write source files.
 
     Source verification uses Phase 1 discovery to recompute the image ID from
@@ -193,6 +194,9 @@ def analyze_exports(siglip_paths, florence_paths, *, source_roots=None, allow_un
             "interpretation": "Descriptive whole-token caption mentions, including negation; not verified OCR, object detection or semantic classification."},
         "interpretation": "Judge model outputs and target-hit rates are not actual human recognition or calibrated probabilities.",
     }
+    if imageability_source is not None:
+        from .imageability import stratify_imageability
+        return stratify_imageability(rows, summary, imageability_source)
     return rows, summary
 
 
@@ -221,5 +225,8 @@ def write_report(rows, summary, output_dir):
     text.extend(["", "Categories overlap; lexicons are illustrative, not exhaustive. Absence of a cue does not establish absence of an object or concept.", "",
                  "Unmatched image IDs (excluded only when explicitly requested): " + json.dumps(summary["unmatched_ids"]), "",
                  "See summary.json for input hashes, model IDs, configuration hashes and complete heuristic definitions.", ""])
+    if "imageability" in summary:
+        from .imageability import imageability_markdown
+        text.extend(imageability_markdown(summary["imageability"]))
     (output_dir / "report.md").write_text("\n".join(text), encoding="utf-8")
     return output_dir

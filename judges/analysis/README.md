@@ -131,3 +131,99 @@ CPU-only synthetic fixture tests:
 ```powershell
 python -m unittest discover -s judges/tests -p test_analysis.py -v
 ```
+
+## Phase 6: imageability-stratified analysis
+
+Stratification is opt-in; omitting `--imageability-metadata` preserves the
+existing overall analysis and CSV schema. With the flag, `comparison.csv` is
+enriched, `summary.json` retains all overall fields and adds `imageability`, and
+`report.md` retains the overall report followed by two three-category tables.
+Existing output directories are never overwritten.
+
+The actual `dataset/processed/sampled_words.csv` schema contains:
+
+| Source column | Usage |
+| --- | --- |
+| `word` | Canonical word join after stripping whitespace and lowercasing. |
+| `score_bin` | Existing imageability label: `[1, 3]` low, `(3, 5]` medium, `(5, 7]` high. |
+| `glasgow_imageability_mean` | Original Glasgow imageability score; required and carried into the CSV. |
+| `glasgow_imageability_sd`, `glasgow_imageability_n` | Original rating uncertainty/rater count, carried through when available. |
+
+The current official metadata has 150 unique words, 50 in each recorded bin.
+The labels and interval meanings are reused from the dataset builder and its
+README; no quantiles, new thresholds or classifications are inferred. Scores
+are checked against their **recorded** intervals for consistency. A missing
+label is an error even when its score might suggest a bin.
+
+Regenerate the 35-image pilot into a fresh output directory:
+
+```powershell
+Set-Location "C:\Users\orjue\Documents\Visibility_Thresholds"
+python -m judges.analyze --siglip2 "judge_results/siglip2_pilot.json" --florence2 "judge_results/florence2_pilot.json" --imageability-metadata "dataset/processed/sampled_words.csv" --output-dir "judge_results/pilot35_imageability_v2"
+```
+
+The implementation run produced `judge_results/pilot35_imageability/` with
+`comparison.csv`, `summary.json` and `report.md`. Use another new directory for
+subsequent regenerations. No inference or GPU is needed. Existing multi-export,
+source relocation and explicit unmatched-export behavior remain supported.
+
+Join validation is strict and occurs before report files are created:
+
+- Every evaluated canonical target must match exactly one metadata record. No
+  fuzzy matching, stemming, guessing from captions or first/last-match choice is
+  allowed. Missing targets are all listed in `ImageabilityMetadataError.issues`.
+- Duplicate canonical words are rejected even for identical rows; conflicting
+  ratings/categories are reported as ambiguous. Case/whitespace variants cannot
+  create multiple matches. Duplicate CSV headers are also rejected.
+- Required columns, nonblank canonical words, recognized source labels and
+  finite, interval-consistent mean scores are required. All supplied metadata
+  records are validated, including unused words, rather than silently removing
+  incomplete rows. Present SD/count columns must contain valid values. If those
+  optional columns are entirely absent, the audit explicitly lists them and
+  their enriched CSV values are null; category and mean score are never optional.
+- An entire category absent from the metadata is recorded explicitly. If no
+  evaluated targets require it, its report row still appears. An evaluated
+  target absent from metadata is an error, not an excluded observation.
+- All three categories always appear. Empty groups have zero counts, status
+  `empty`, and JSON null / Markdown N/A rates and rank statistics, not fabricated
+  zeros. The audit reports empty evaluated groups separately from categories
+  absent from the metadata file. There is no skip-missing-metadata option.
+
+Added CSV columns are `canonical_target_word`, `imageability_metadata_word`,
+`imageability_group`, `score_bin`, `glasgow_imageability_mean`,
+`glasgow_imageability_sd` and `glasgow_imageability_n`. Original captions and
+existing comparison columns remain unchanged.
+
+`summary.imageability.groups.low/medium/high` contains image count, unique
+canonical target count/list, SigLIP2 top-1/top-5 hits and rates, and mean/median
+1-based target rank. It also contains caption counts, fractions and percentages
+for the existing apparent-text, object and abstract-concept cue lists. These
+are reused Phase 4 lexical heuristics: not verified OCR, semantic recognition,
+evidence of internal attention, or human recognizability. Negated mentions still
+count, categories overlap, and cue absence does not establish visual absence.
+
+**Images remain the observations.** Multiple generated images of one word are
+retained and contribute separately to rates and mean/median ranks. Unique word
+counts show this repetition; there is no hidden word-level aggregation or
+assumption that category image counts are balanced. These are descriptive
+summaries only, without causal claims, significance tests or claims about
+human recognition.
+
+The metadata path, SHA-256, source column names, label mapping, category word
+counts and validation/coverage diagnostics are recorded. The overall and each
+group's SigLIP2 vocabulary size/hash stay explicit; existing model identifiers,
+configuration hashes and export provenance remain in the summary. The 35-image
+pilot is evaluated against 150 candidates, not a 35-word vocabulary. A future
+2,000+ **image** cohort may still use 150 candidate words; if the vocabulary
+itself changes, its actual exported size/hash will be reported instead. Supply
+a matching, complete CSV through the same option for future target vocabularies;
+the join is indexed by word and imposes no 150-row or image-count limit.
+
+CPU-only tests cover repeated targets, preserved overall values/captions,
+metadata duplicates/conflicts/missing targets, incomplete scores/categories,
+source interval boundaries, empty groups, count/rate/median calculations and CLI
+output integration:
+
+```powershell
+python -m unittest discover -s judges/tests -p test_imageability.py -v
+```
