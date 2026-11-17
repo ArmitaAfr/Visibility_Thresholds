@@ -1,0 +1,10 @@
+torch==2.6.0+cpu
+torchvision==0.21.0+cpu
+transformers==4.49.0
+easyocr==1.7.2
+rapidfuzz
+sentencepiece
+protobuf
+numpy
+pillow
+filelock

@@ -111,6 +111,9 @@ def run_job(config, mode="run", *, resume=False):
     roots = config["input_roots"]
     experiments = select_experiments(discover_experiments(roots).experiments,
                                      config.get("shard_index", 1), config.get("num_shards", 1))
+    expected = config.get("expected_image_ids")
+    if expected is not None and [e.image_id for e in experiments] != expected:
+        raise ValueError("Discovered shard differs from the verified image manifest.")
     if not experiments:
         raise ValueError("No images assigned to this shard.")
     if mode == "benchmark":
@@ -132,6 +135,9 @@ def run_job(config, mode="run", *, resume=False):
                 "judge_source_sha256": source_fingerprint(), "environment": environment_profile()}
     # Canonicalize tuples/Path-free config to the same representation read from disk.
     manifest = json.loads(json.dumps(manifest, allow_nan=False))
+    if ("expected_vocabulary_sha256" in config and
+            manifest["vocabulary_file_sha256"] != config["expected_vocabulary_sha256"]):
+        raise ValueError("Judge vocabulary differs from the verified manifest.")
     if resume:
         saved = json.loads((job_dir / "job_manifest.json").read_text(encoding="utf-8"))
         if saved != manifest:
@@ -175,6 +181,14 @@ def run_job(config, mode="run", *, resume=False):
         report["job_manifest"] = str(job_dir / "job_manifest.json")
         _new_json(job_dir / "benchmark.json", report)
         print(json.dumps(report, indent=2))
+    if expected is not None and mode == "run":
+        receipt = job_dir / "complete.json"
+        completion = {"export_sha256": file_digest(export), "job_manifest_sha256": digest(manifest)}
+        if receipt.exists():
+            if json.loads(receipt.read_text(encoding="utf-8")) != completion:
+                raise ValueError("Existing completion record differs from verified export.")
+        else:
+            _new_json(receipt, completion)
     print(f"{len(results)} results: {export}")
     return job_dir
 

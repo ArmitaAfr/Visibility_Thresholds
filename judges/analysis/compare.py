@@ -91,6 +91,28 @@ def _siglip_prediction(row):
     return words, size, vocabulary_hash
 
 
+def recognition_fields(row):
+    words, size, vocabulary_hash = _siglip_prediction(row)
+    fields = {"siglip2_top1_prediction": words[0],
+              "siglip2_top5_predictions": [p["word"] for p in row["raw_output"]["top5"]],
+              "siglip2_target_rank": row["target_rank"], "siglip2_target_score": row["target_score"]}
+    return fields, (size, vocabulary_hash, tuple(sorted(words)))
+
+
+def caption_fields(row):
+    caption = row["raw_output"].get("caption")
+    if not isinstance(caption, str) or not caption.strip():
+        raise ValueError(f"Missing Florence original caption for {row['image_id']}.")
+    if row.get("target_rank") is not None or row.get("target_score") is not None:
+        raise ValueError("Florence caption results must not contain candidate ranks/scores.")
+    cues = caption_patterns(caption)
+    return {"florence2_original_caption": caption,
+            "florence2_normalized_caption": row["normalized_prediction"],
+            "florence2_mentions_apparent_text": bool(cues["apparent_text"]),
+            "florence2_text_mention_cues": cues["apparent_text"], "florence2_object_cues": cues["objects"],
+            "florence2_abstract_concept_cues": cues["abstract_concepts"]}
+
+
 def analyze_exports(siglip_paths, florence_paths, *, source_roots=None, allow_unmatched=False,
                     imageability_source=None):
     """Return combined rows and a deterministic summary; never write source files.
@@ -144,31 +166,20 @@ def analyze_exports(siglip_paths, florence_paths, *, source_roots=None, allow_un
         verify(flo)
         if sig["target_word"].strip().lower() != flo["target_word"].strip().lower():
             raise ValueError(f"Target disagreement for {image_id}.")
-        words, size, vocabulary_hash = _siglip_prediction(sig)
-        vocabularies.add((size, vocabulary_hash, tuple(sorted(words))))
-        raw = flo["raw_output"]
-        caption = raw.get("caption")
-        if not isinstance(caption, str) or not caption.strip():
-            raise ValueError(f"Missing Florence original caption for {image_id}.")
-        if flo.get("target_rank") is not None or flo.get("target_score") is not None:
-            raise ValueError("Florence caption results must not contain candidate ranks/scores.")
-        patterns = caption_patterns(caption)
-        for category, cues in patterns.items():
-            pattern_counts[category] += bool(cues)
-            cue_counts[category].update(cues)
+        sig_fields, vocabulary = recognition_fields(sig)
+        vocabularies.add(vocabulary)
         rows.append({
             "image_id": image_id, "target_word": sig["target_word"], "image_path": str(source.image_path),
-            "image_sha256": file_digest(source.image_path),
-            "siglip2_top1_prediction": words[0],
-            "siglip2_top5_predictions": [p["word"] for p in sig["raw_output"]["top5"]],
-            "siglip2_target_rank": sig["target_rank"], "siglip2_target_score": sig["target_score"],
-            "florence2_original_caption": caption, "florence2_normalized_caption": flo["normalized_prediction"],
-            "florence2_mentions_apparent_text": bool(patterns["apparent_text"]),
-            "florence2_text_mention_cues": patterns["apparent_text"],
-            "florence2_object_cues": patterns["objects"], "florence2_abstract_concept_cues": patterns["abstract_concepts"],
+            "image_sha256": file_digest(source.image_path), **sig_fields, **caption_fields(flo),
             "siglip2_inference_time_seconds": sig["inference_time_seconds"],
             "florence2_inference_time_seconds": flo["inference_time_seconds"],
         })
+        for category, column in (("apparent_text", "florence2_text_mention_cues"),
+                                 ("objects", "florence2_object_cues"),
+                                 ("abstract_concepts", "florence2_abstract_concept_cues")):
+            cues = rows[-1][column]
+            pattern_counts[category] += bool(cues)
+            cue_counts[category].update(cues)
     if len(vocabularies) != 1:
         raise ValueError("SigLIP2 candidate vocabulary differs across compared images.")
     size, vocabulary_hash, _ = next(iter(vocabularies))

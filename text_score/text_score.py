@@ -31,7 +31,7 @@ def letters(s):
 
 
 class Scorer:
-    def __init__(self, upscale=3):
+    def __init__(self, upscale=3, *, revision=None):
 
         # Imported here so the models only load when a Scorer is made
         import easyocr
@@ -40,8 +40,9 @@ class Scorer:
         self.upscale = upscale
         self.ocr = easyocr.Reader(["en"], gpu=False, verbose=False)
 
-        self.model = AutoModel.from_pretrained(SIGLIP).eval()
-        self.proc = AutoProcessor.from_pretrained(SIGLIP)
+        load_options = {"revision": revision} if revision is not None else {}
+        self.model = AutoModel.from_pretrained(SIGLIP, **load_options).eval()
+        self.proc = AutoProcessor.from_pretrained(SIGLIP, **load_options)
 
         # Encode the two probe prompts once, reused for every image
         self.probe = self.text(PROBE)

@@ -28,6 +28,11 @@ class DiscoveryError(ValueError):
         super().__init__("\n".join(f"{i.code}: {i.path}: {i.message}" for i in report.issues))
 
 
+def canonical_image_id(canonical_metadata: str, png_bytes: bytes) -> str:
+    """The judge identity for sorted, ASCII-escaped JSON and original PNG bytes."""
+    return hashlib.sha256(canonical_metadata.encode() + b"\x00" + png_bytes).hexdigest()
+
+
 def discover_experiments(
     roots: str | Path | Iterable[str | Path], *, strict: bool = True
 ) -> DiscoveryReport:
@@ -81,7 +86,7 @@ def discover_experiments(
             except (OSError, ValueError) as exc:
                 issue("missing_image", image, str(exc))
                 continue
-            image_id = hashlib.sha256(canonical.encode() + b"\x00" + content).hexdigest()
+            image_id = canonical_image_id(canonical, content)
             if image_id in seen_ids:
                 issue("duplicate_record", path, f"Identical metadata and image: {seen_ids[image_id]}")
                 continue
