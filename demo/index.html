@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visibility Threshold Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* layout: the drawing sheet on the left, the judges' readout on the right; stacks on phones */
+  --bg: #eceff3;
+  --surface: #ffffff;
+  --ink: #141922;
+  --muted: #5a6373;
+  --line: #d3d9e2;
+  --accent: #2545c4;
+  --accent-soft: #e2e7fa;
+  --ok: #15784a;
+  --ok-soft: #d9f0e3;
+  --warn: #9a5a00;
+  --warn-soft: #faead2;
+  --bad: #ac2430;
+  --bad-soft: #f7dde0;
+  --paper: #ffffff;
+  --paper-grid: #edf0f5;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1117;
+    --surface: #161b24;
+    --ink: #e7eaf0;
+    --muted: #98a1b1;
+    --line: #2a313d;
+    --accent: #8098ff;
+    --accent-soft: #1d2545;
+    --ok: #4fc287;
+    --ok-soft: #12301f;
+    --warn: #e4a74c;
+    --warn-soft: #33260e;
+    --bad: #f17b85;
+    --bad-soft: #3a191d;
+    --paper: #f7f8fa;
+    --paper-grid: #e6e9ef;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1117;
+  --surface: #161b24;
+  --ink: #e7eaf0;
+  --muted: #98a1b1;
+  --line: #2a313d;
+  --accent: #8098ff;
+  --accent-soft: #1d2545;
+  --ok: #4fc287;
+  --ok-soft: #12301f;
+  --warn: #e4a74c;
+  --warn-soft: #33260e;
+  --bad: #f17b85;
+  --bad-soft: #3a191d;
+  --paper: #f7f8fa;
+  --paper-grid: #e6e9ef;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px clamp(16px, 4vw, 40px) 48px;
+  display: grid;
+  gap: 20px;
+}
+header { display: grid; gap: 8px; }
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(28px, 4.2vw, 42px);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.lede { margin: 0; max-width: 68ch; color: var(--muted); }
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 14.5px;
+}
+.banner .tag {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 500;
+}
+.banner .tag.real { background: var(--ok-soft); color: var(--ok); }
+.banner p { margin: 0; flex: 1 1 320px; }
+.banner .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.banner .err { flex-basis: 100%; margin: 0; color: var(--bad); font-weight: 500; }
+
+.concepts { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 15px var(--font-body);
+  cursor: pointer;
+}
+.chip .thr {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.chip[aria-pressed="true"] .thr { color: var(--accent); }
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+
+.sheet {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.sheet canvas {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.sheet-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.counter { font-family: var(--font-display); display: flex; align-items: baseline; gap: 8px; }
+.counter .n {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+.counter .of { color: var(--muted); font-family: var(--font-body); font-size: 15px; }
+.word { font-family: var(--font-mono); color: var(--muted); font-size: 14px; }
+
+.readout { display: grid; gap: 14px; }
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+}
+.status {
+  border-left: 5px solid var(--line);
+  display: grid;
+  gap: 4px;
+  transition: background-color .25s ease;
+}
+.status h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.status p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.status[data-state="ok"] { border-left-color: var(--ok); background: var(--ok-soft); }
+.status[data-state="ok"] h2 { color: var(--ok); }
+.status[data-state="warn"] { border-left-color: var(--warn); background: var(--warn-soft); }
+.status[data-state="warn"] h2 { color: var(--warn); }
+.status[data-state="bad"] { border-left-color: var(--bad); background: var(--bad-soft); }
+.status[data-state="bad"] h2 { color: var(--bad); }
+.status.flash { animation: flash 0.9s ease 1; }
+@keyframes flash { 0% { transform: scale(1); } 30% { transform: scale(1.025); } 100% { transform: scale(1); } }
+
+.meters { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 420px) { .meters { grid-template-columns: 1fr; } }
+.meter { display: grid; gap: 6px; }
+.meter .label { font-size: 13px; color: var(--muted); font-weight: 500; }
+.meter .val {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.meter .val small { font-size: 13px; color: var(--muted); font-weight: 400; }
+.bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--paper-grid);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: visible;
+}
+.bar .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 999px;
+  background: var(--muted);
+  transition: width .25s ease, background-color .25s ease;
+}
+.bar .fill.pass { background: var(--ok); }
+.bar .tick {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--ink);
+  border-radius: 1px;
+}
+.meter .rule { font-size: 12.5px; color: var(--muted); }
+
+.chart-panel { display: grid; gap: 6px; }
+.chart-panel h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.chart-panel .note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.chart-box { overflow-x: auto; }
+#chart { width: 100%; min-width: 300px; height: auto; display: block; }
+#chart text { font-family: var(--font-mono); font-size: 10.5px; fill: var(--muted); }
+#chart .axis { stroke: var(--line); }
+#chart .band { fill: var(--ok-soft); }
+#chart .band-label { fill: var(--ok); font-weight: 500; }
+#chart .series { fill: none; stroke: var(--accent); stroke-width: 2; }
+#chart .pt { stroke: var(--surface); stroke-width: 2; }
+#chart .pt.hit { fill: var(--ok); }
+#chart .pt.miss { fill: var(--muted); }
+#chart .playhead { stroke: var(--accent); stroke-dasharray: 3 3; }
+#chart .thr-line { stroke: var(--ok); stroke-width: 2; }
+#chart .thr-label { fill: var(--ok); font-weight: 500; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, .filebtn {
+  font: 500 14.5px var(--font-body);
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] button.primary { color: #0e1117; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #0e1117; } }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, .chip:focus-visible, select:focus-visible, input:focus-visible + span, .filebtn:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.filebtn { position: relative; display: inline-flex; align-items: center; }
+.filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.opt { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+select {
+  font: 14px var(--font-body);
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+details.format {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+details.format summary { cursor: pointer; font-weight: 600; }
+details.format p { max-width: 70ch; color: var(--muted); font-size: 14.5px; }
+pre {
+  margin: 0;
+  overflow-x: auto;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font: 13px/1.55 var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status.flash { animation: none; }
+  .bar .fill, .status { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">QMIND · Visibility Thresholds · midpoint demo</p>
+    <h1>How many strokes does a concept need?</h1>
+    <p class="lede">A CLIPDraw drawing is replayed one stroke at a time, most important stroke first. At 8, 16, 32, 64, 128 and 256 strokes, two independent judges (SigLIP and Florence) check whether they can recognize the concept. Its visibility threshold is the first stroke count where it is recognized and stays recognized at every larger count.</p>
+  </header>
+
+  <div class="banner" id="banner">
+    <span class="tag" id="dataTag">Example data</span>
+    <p id="bannerText">These drawings and judge scores are hand-made examples to show the idea. Load the JSON exported from Colab to replay real CLIPDraw runs.</p>
+    <div class="actions">
+      <label class="filebtn">Load results JSON<input type="file" id="fileInput" accept=".json,application/json"></label>
+      <button type="button" id="restoreBtn" hidden>Show examples again</button>
+    </div>
+    <p class="err" id="fileError" hidden></p>
+  </div>
+
+  <nav class="concepts" id="concepts" aria-label="Choose a concept"></nav>
+
+  <main class="stage">
+    <section class="sheet" aria-label="Drawing">
+      <canvas id="cv" width="448" height="448" aria-label="CLIPDraw strokes for the selected concept"></canvas>
+      <div class="sheet-foot">
+        <div class="counter"><span class="n" id="nNow">0</span><span class="of" id="nOf">of 256 strokes</span></div>
+        <span class="word" id="promptText">“A drawing of apple.”</span>
+      </div>
+      <div class="controls">
+        <button type="button" class="primary" id="replayBtn">Replay from first stroke</button>
+        <button type="button" id="pauseBtn">Pause</button>
+        <button type="button" id="jumpBtn">Jump to threshold</button>
+        <button type="button" id="allBtn">Show all strokes</button>
+      </div>
+      <div class="controls">
+        <label class="opt" for="speedSel">Speed
+          <select id="speedSel">
+            <option value="4">4 strokes / s</option>
+            <option value="12" selected>12 strokes / s</option>
+            <option value="40">40 strokes / s</option>
+          </select>
+        </label>
+        <label class="opt" for="stopChk"><input type="checkbox" id="stopChk" checked> Pause when the threshold is reached</label>
+      </div>
+    </section>
+
+    <section class="readout" aria-label="Judges">
+      <div class="panel status" id="status" data-state="neutral" aria-live="polite">
+        <h2 id="statusTitle">Drawing</h2>
+        <p id="statusDetail"></p>
+      </div>
+
+      <div class="panel meters">
+        <div class="meter">
+          <span class="label">SigLIP rank</span>
+          <span class="val" id="sigVal">–</span>
+          <div class="bar"><div class="fill" id="sigFill"></div><div class="tick" id="sigTick"></div></div>
+          <span class="rule" id="sigRule">needs top 5 of 100 words</span>
+        </div>
+        <div class="meter">
+          <span class="label">Florence caption match</span>
+          <span class="val" id="florVal">–</span>
+          <div class="bar"><div class="fill" id="florFill"></div><div class="tick" id="florTick"></div></div>
+          <span class="rule" id="florRule">needs 0.50 or more</span>
+        </div>
+      </div>
+
+      <div class="panel chart-panel">
+        <h3>SigLIP rank at each checkpoint</h3>
+        <div class="chart-box"><svg id="chart" viewBox="0 0 380 210" role="img" aria-label="SigLIP rank of the target word by stroke count"></svg></div>
+        <p class="note">Rank 1 means SigLIP picked the target word over every distractor. Green dots passed both judges.</p>
+      </div>
+    </section>
+  </main>
+
+  <details class="format">
+    <summary>File format for real runs</summary>
+    <p>The Colab script <code>export_for_demo.py</code> writes this. A file can hold one concept or a list of them. Strokes are listed most important first. Each stroke is a diffvg cubic path: 3k + 1 points in canvas pixels, with a width and an RGBA colour from 0 to 1.</p>
+    <pre>[
+  {
+    "word": "apple",
+    "prompt": "A drawing of apple.",
+    "canvas": 224,
+    "rank_cutoff": 5,
+    "num_candidates": 100,
+    "florence_cutoff": 0.5,
+    "strokes": [
+      { "points": [[101.2, 74.0], [118.9, 70.3], [140.1, 77.8], [160.4, 96.2]],
+        "width": 3.1, "color": [0.42, 0.06, 0.05, 0.95] }
+    ],
+    "budgets": [
+      { "n": 8,  "siglip_rank": 23, "florence_score": 0.31 },
+      { "n": 16, "siglip_rank": 4,  "florence_score": 0.58 }
+    ]
+  }
+]</pre>
+  </details>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- example data (hand-made, illustrative only) ----------
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+  function dense(poly, closed) {
+    var P = closed ? poly.concat([poly[0]]) : poly, out = [];
+    for (var i = 0; i < P.length - 1; i++) {
+      var a = P[i], b = P[i + 1];
+      var len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(len));
+      for (var k = 0; k < n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+    }
+    out.push(P[P.length - 1]);
+    return out;
+  }
+  function tint(c, rng, amt) {
+    amt = amt == null ? 0.06 : amt;
+    return [clamp01(c[0] + (rng() - .5) * amt), clamp01(c[1] + (rng() - .5) * amt), clamp01(c[2] + (rng() - .5) * amt), c[3]];
+  }
+  function outline(poly, closed, segLen, color, width, rng) {
+    var d = dense(poly, closed), out = [], j = 1.4;
+    for (var s = 0; s < d.length - 2; s += segLen) {
+      var e = Math.min(s + segLen + 3, d.length - 1), span = e - s;
+      var idx = [s, Math.round(s + span / 3), Math.round(s + 2 * span / 3), e];
+      out.push({
+        points: idx.map(function (i) { return [d[i][0] + (rng() - .5) * j, d[i][1] + (rng() - .5) * j]; }),
+        width: width * (0.85 + 0.3 * rng()),
+        color: tint(color, rng)
+      });
+    }
+    return out;
+  }
+  function scribble(cx, cy, size, color, width, rng) {
+    var segs = 1 + Math.floor(rng() * 3), pts = [[cx, cy]], x = cx, y = cy;
+    for (var i = 0; i < segs * 3; i++) { x += (rng() - .5) * size; y += (rng() - .5) * size; pts.push([x, y]); }
+    return { points: pts, width: width, color: color };
+  }
+  function spread(arr) {
+    return arr.map(function (s, i) { return [((i * 0.6180339) % 1), s]; })
+      .sort(function (a, b) { return a[0] - b[0]; }).map(function (p) { return p[1]; });
+  }
+  function noise(rng, count) {
+    var out = [];
+    for (var i = 0; i < count; i++) {
+      var h = rng();
+      var col = [0.3 + 0.6 * Math.abs(Math.sin(h * 6.3)), 0.3 + 0.6 * Math.abs(Math.sin(h * 6.3 + 2)), 0.3 + 0.6 * Math.abs(Math.sin(h * 6.3 + 4)), 0.14 + 0.2 * rng()];
+      out.push(scribble(20 + rng() * 184, 20 + rng() * 184, 30, col, 1.5 + rng() * 2, rng));
+    }
+    return out;
+  }
+  function circle(cx, cy, r, n) {
+    var p = [];
+    for (var i = 0; i < n; i++) { var t = i / n * Math.PI * 2; p.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]); }
+    return p;
+  }
+  function fillTo(list, rng, total) { return list.slice(0, total).concat(noise(rng, Math.max(0, total - list.length))); }
+
+  function apple() {
+    var rng = mulberry32(11);
+    var at = function (t, s) { return [112 + s * 66 * Math.sin(t), 130 + s * (-60 * Math.cos(t) + 10 * Math.cos(2 * t) - 6)]; };
+    var body = []; for (var i = 0; i < 90; i++) body.push(at(i / 90 * Math.PI * 2, 1));
+    var out = spread(outline(body, true, 30, [0.42, 0.06, 0.05, 0.95], 3.4, rng));
+    var stem = outline([[112, 80], [113, 66], [118, 50]], false, 40, [0.32, 0.2, 0.1, 1], 4, rng);
+    var A = -0.5, leaf = [];
+    for (i = 0; i < 40; i++) { var t = i / 40 * Math.PI * 2; leaf.push([134 + 14 * Math.cos(t) * Math.cos(A) - 6 * Math.sin(t) * Math.sin(A), 58 + 14 * Math.cos(t) * Math.sin(A) + 6 * Math.sin(t) * Math.cos(A)]); }
+    var leafS = outline(leaf, true, 22, [0.18, 0.5, 0.16, 0.95], 3, rng);
+    var fill = [];
+    for (i = 0; i < 130; i++) {
+      var p = at(rng() * Math.PI * 2, Math.sqrt(rng()) * 0.8), r = rng();
+      fill.push(scribble(p[0], p[1], 22, [0.78 + 0.15 * r, 0.08 + 0.15 * rng(), 0.08 + 0.1 * rng(), 0.5 + 0.3 * rng()], 3 + 5 * rng(), rng));
+      if (i % 16 === 0) { var q = at(-1.2 + rng() * 0.8, 0.6); fill.push(scribble(q[0], q[1], 14, [1, 0.86, 0.86, 0.7], 3, rng)); }
+    }
+    return fillTo(out.slice(0, 6).concat(stem, leafS, out.slice(6), fill), rng, 256);
+  }
+
+  function house() {
+    var rng = mulberry32(23), i;
+    var roof = outline([[48, 114], [112, 54], [176, 114]], true, 30, [0.62, 0.14, 0.1, 0.95], 3.4, rng);
+    var walls = outline([[62, 112], [162, 112], [162, 190], [62, 190]], true, 30, [0.16, 0.2, 0.3, 0.95], 3.2, rng);
+    var key = spread(roof.concat(walls));
+    var door = outline([[100, 190], [100, 150], [124, 150], [124, 190]], false, 26, [0.4, 0.24, 0.12, 0.95], 3, rng);
+    var win = outline([[132, 126], [154, 126], [154, 146], [132, 146]], true, 22, [0.16, 0.3, 0.55, 0.95], 2.6, rng)
+      .concat(outline([[143, 126], [143, 146]], false, 30, [0.16, 0.3, 0.55, 0.9], 2, rng), outline([[132, 136], [154, 136]], false, 30, [0.16, 0.3, 0.55, 0.9], 2, rng));
+    var chim = outline([[136, 80], [136, 62], [150, 62], [150, 92]], false, 26, [0.3, 0.2, 0.18, 0.95], 3, rng);
+    var ground = outline([[26, 193], [198, 193]], false, 34, [0.25, 0.55, 0.25, 0.9], 3.5, rng);
+    var fill = [];
+    for (i = 0; i < 70; i++) {
+      var x = 68 + rng() * 88, y = 118 + rng() * 66;
+      if (x > 96 && x < 128 && y > 146) continue;
+      fill.push(scribble(x, y, 18, [0.86, 0.78 + 0.08 * rng(), 0.6, 0.45 + 0.3 * rng()], 3 + 4 * rng(), rng));
+    }
+    for (i = 0; i < 55; i++) {
+      var u = rng(), v = rng(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
+      var px = 52 + u * (112 - 52) + v * (172 - 52), py = 112 + u * (58 - 112) + v * (112 - 112);
+      fill.push(scribble(px, py, 16, [0.75 + 0.15 * rng(), 0.18 + 0.1 * rng(), 0.12, 0.55 + 0.25 * rng()], 3 + 4 * rng(), rng));
+    }
+    for (i = 0; i < 12; i++) fill.push(scribble(135 + rng() * 17, 129 + rng() * 15, 8, [0.55, 0.75, 0.95, 0.7], 3, rng));
+    for (i = 0; i < 14; i++) fill.push(scribble(30 + rng() * 164, 22 + rng() * 22, 26, [0.5, 0.7, 0.95, 0.35], 4, rng));
+    return fillTo(key.concat(door, win, chim, ground, spread(fill)), rng, 256);
+  }
+
+  function bicycle() {
+    var rng = mulberry32(37), i;
+    var dark = [0.13, 0.15, 0.2, 0.95];
+    var imp = spread(outline(circle(66, 150, 34, 60), true, 26, dark, 3.4, rng).concat(outline(circle(158, 150, 34, 60), true, 26, dark, 3.4, rng)))
+      .concat(outline([[66, 150], [98, 104], [112, 150], [66, 150]], false, 30, [0.15, 0.35, 0.7, 0.95], 3.6, rng),
+        outline([[98, 104], [150, 100], [112, 150]], false, 30, [0.15, 0.35, 0.7, 0.95], 3.6, rng),
+        outline([[150, 100], [158, 150]], false, 30, dark, 3.2, rng),
+        outline([[144, 90], [150, 100], [164, 90]], false, 18, dark, 3.2, rng),
+        outline([[88, 98], [108, 98]], false, 30, [0.2, 0.12, 0.08, 0.95], 5, rng));
+    var spokes = [];
+    for (i = 0; i < 24; i++) {
+      var c = i % 2 ? [158, 150] : [66, 150], t = rng() * Math.PI * 2;
+      spokes.push({ points: [c, [c[0] + 11 * Math.cos(t), c[1] + 11 * Math.sin(t)], [c[0] + 22 * Math.cos(t), c[1] + 22 * Math.sin(t)], [c[0] + 33 * Math.cos(t), c[1] + 33 * Math.sin(t)]], width: 1.2, color: [0.45, 0.47, 0.52, 0.8] });
+    }
+    var filler = noise(rng, 256), seq = [], fi = 0, si = 0;
+    // key strokes are spread across the first ~120 positions, so the bike emerges slowly
+    var slots = {};
+    imp.forEach(function (s, k) { slots[Math.round(k * 120 / imp.length)] = s; });
+    for (i = 0; i < 256; i++) {
+      if (slots[i]) seq.push(slots[i]);
+      else if (i > 60 && si < spokes.length && i % 3 === 0) seq.push(spokes[si++]);
+      else seq.push(filler[fi++]);
+    }
+    return seq;
+  }
+
+  function justice() {
+    var rng = mulberry32(53), out = [], i;
+    for (i = 0; i < 60; i++) out.push(scribble(80 + rng() * 64, 70 + rng() * 84, 40, [0.12, 0.12, 0.16, 0.6 + 0.3 * rng()], 2 + 2 * rng(), rng));
+    for (i = 0; i < 30; i++) out.push(scribble(40 + rng() * 144, 40 + rng() * 144, 34, [0.7 * rng(), 0.4 + 0.4 * rng(), 0.8 * rng(), 0.45], 2 + 3 * rng(), rng));
+    return fillTo(spread(out), rng, 256);
+  }
+
+  function sample(word, strokes, ranks, flor) {
+    return {
+      word: word, prompt: "A drawing of " + word + ".", canvas: 224,
+      rank_cutoff: 5, num_candidates: 100, florence_cutoff: 0.5,
+      strokes: strokes,
+      budgets: [8, 16, 32, 64, 128, 256].map(function (n, i) { return { n: n, siglip_rank: ranks[i], florence_score: flor[i] }; })
+    };
+  }
+  function examples() {
+    return [
+      sample("apple", apple(), [23, 4, 2, 1, 1, 1], [0.31, 0.58, 0.66, 0.71, 0.74, 0.75]),
+      sample("house", house(), [61, 14, 3, 2, 1, 1], [0.22, 0.41, 0.62, 0.70, 0.72, 0.73]),
+      sample("bicycle", bicycle(), [88, 52, 5, 9, 3, 2], [0.12, 0.20, 0.51, 0.46, 0.60, 0.66]),
+      sample("justice", justice(), [71, 64, 48, 40, 33, 29], [0.08, 0.10, 0.12, 0.15, 0.14, 0.16])
+    ].map(prepare);
+  }
+
+  // ---------- data handling ----------
+  function cleanPoints(pts) {
+    var p = pts.map(function (q) { return [Number(q[0]), Number(q[1])]; });
+    if ((p.length - 1) % 3 === 0) return p;
+    if (p.length % 3 === 0) return p.concat([p[0]]); // closed diffvg path
+    return p.slice(0, Math.floor((p.length - 1) / 3) * 3 + 1);
+  }
+  function prepare(c, i) {
+    if (!c || typeof c.word !== "string") throw new Error("Concept " + (i + 1) + " has no \"word\" field.");
+    if (!Array.isArray(c.strokes) || !c.strokes.length) throw new Error("\"" + c.word + "\" has no strokes.");
+    if (!Array.isArray(c.budgets) || !c.budgets.length) throw new Error("\"" + c.word + "\" has no budgets (judge results).");
+    var strokes = c.strokes.map(function (s) {
+      var col = (s.color || [0, 0, 0, 1]).map(Number);
+      if (col.length === 3) col.push(1);
+      return { pts: cleanPoints(s.points || []), width: Number(s.width) || 2, color: col };
+    }).filter(function (s) { return s.pts.length >= 4; });
+    var budgets = c.budgets.map(function (b) {
+      return {
+        n: Number(b.n),
+        siglip_rank: b.siglip_rank == null ? null : Number(b.siglip_rank),
+        florence_score: b.florence_score == null ? null : Number(b.florence_score),
+        recognized: typeof b.recognized === "boolean" ? b.recognized : null
+      };
+    }).sort(function (a, b) { return a.n - b.n; });
+    var out = {
+      word: c.word,
+      prompt: c.prompt || ("A drawing of " + c.word + "."),
+      canvas: Number(c.canvas) || 224,
+      rank_cutoff: c.rank_cutoff == null ? 5 : Number(c.rank_cutoff),
+      num_candidates: Number(c.num_candidates) || 100,
+      florence_cutoff: c.florence_cutoff == null ? null : Number(c.florence_cutoff),
+      strokes: strokes,
+      budgets: budgets
+    };
+    out.threshold = threshold(out);
+    return out;
+  }
+  function isRec(c, b) {
+    if (b.recognized !== null) return b.recognized;
+    var rankOk = b.siglip_rank == null ? true : b.siglip_rank <= c.rank_cutoff;
+    var florOk = (c.florence_cutoff == null || b.florence_score == null) ? true : b.florence_score >= c.florence_cutoff;
+    return rankOk && florOk;
+  }
+  function threshold(c) {
+    var hits = c.budgets.map(function (b) { return isRec(c, b); });
+    for (var i = 0; i < hits.length; i++) {
+      if (hits.slice(i).every(Boolean)) return Math.min(c.budgets[i].n, c.strokes.length);
+    }
+    return null;
+  }
+
+  // ---------- state ----------
+  var concepts = examples(), usingExamples = true, idx = 0;
+  var pos = 0, playing = false, last = null, lastShownN = -1;
+  var speed = 12, stopAtThreshold = true;
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var cv = $("cv"), ctx = cv.getContext("2d");
+
+  function cur() { return concepts[idx]; }
+
+  // ---------- drawing ----------
+  function lerp(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+  function split(p0, p1, p2, p3, t) {
+    var a = lerp(p0, p1, t), b = lerp(p1, p2, t), c = lerp(p2, p3, t), d = lerp(a, b, t), e = lerp(b, c, t);
+    return [a, d, lerp(d, e, t)];
+  }
+  function strokePath(s, frac) {
+    var p = s.pts, k = (p.length - 1) / 3, total = frac * k;
+    ctx.beginPath();
+    ctx.moveTo(p[0][0], p[0][1]);
+    for (var j = 0; j < k; j++) {
+      var a = p[3 * j], b = p[3 * j + 1], c = p[3 * j + 2], d = p[3 * j + 3];
+      if (j + 1 <= total) ctx.bezierCurveTo(b[0], b[1], c[0], c[1], d[0], d[1]);
+      else {
+        var t = total - j;
+        if (t > 0) { var q = split(a, b, c, d, t); ctx.bezierCurveTo(q[0][0], q[0][1], q[1][0], q[1][1], q[2][0], q[2][1]); }
+        break;
+      }
+    }
+    var col = s.color;
+    ctx.strokeStyle = "rgba(" + Math.round(col[0] * 255) + "," + Math.round(col[1] * 255) + "," + Math.round(col[2] * 255) + "," + col[3] + ")";
+    ctx.lineWidth = s.width;
+    ctx.stroke();
+  }
+  function sizeCanvas() {
+    var r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    var px = Math.max(224, Math.round(r.width * dpr));
+    if (cv.width !== px) { cv.width = px; cv.height = px; }
+  }
+  function paint() {
+    var c = cur(), W = cv.width, sc = W / c.canvas;
+    var css = getComputedStyle(document.documentElement);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = css.getPropertyValue("--paper").trim() || "#fff";
+    ctx.fillRect(0, 0, W, W);
+    ctx.strokeStyle = css.getPropertyValue("--paper-grid").trim() || "#eee";
+    ctx.lineWidth = 1;
+    for (var g = 1; g < 8; g++) {
+      var x = Math.round(g * W / 8) + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, W); ctx.moveTo(0, x); ctx.lineTo(W, x); ctx.stroke();
+    }
+    ctx.setTransform(sc, 0, 0, sc, 0, 0);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    var full = Math.floor(pos), n = c.strokes.length;
+    for (var i = 0; i < Math.min(full, n); i++) strokePath(c.strokes[i], 1);
+    if (!reduceMotion && full < n && pos - full > 0.02) strokePath(c.strokes[full], pos - full);
+  }
+
+  // ---------- readout ----------
+  function latestBudget(c, n) {
+    var b = null;
+    c.budgets.forEach(function (x) { if (x.n <= n) b = x; });
+    return b;
+  }
+  function setStatus(state, title, detail) {
+    var el = $("status");
+    el.dataset.state = state;
+    $("statusTitle").textContent = title;
+    $("statusDetail").textContent = detail;
+  }
+  function judgeLine(c, b) {
+    var parts = [];
+    if (b.siglip_rank != null) parts.push("SigLIP ranks “" + c.word + "” #" + b.siglip_rank + " of " + c.num_candidates);
+    if (b.florence_score != null) parts.push("Florence match " + b.florence_score.toFixed(2));
+    return parts.join(" · ") + " (checked at " + b.n + " strokes).";
+  }
+  function readout() {
+    var c = cur(), n = Math.floor(pos), total = c.strokes.length, T = c.threshold;
+    $("nNow").textContent = n;
+    $("nOf").textContent = "of " + total + " strokes";
+    $("promptText").textContent = "“" + c.prompt + "”";
+
+    var b = latestBudget(c, n);
+    if (!b) {
+      setStatus("neutral", "Drawing", "The judges first check the drawing at " + c.budgets[0].n + " strokes.");
+    } else if (T != null && n >= T) {
+      setStatus("ok", "Visible at " + T + " strokes", judgeLine(c, b));
+    } else if (isRec(c, b)) {
+      setStatus("warn", "Recognized at " + b.n + ", not yet stable", "Both judges pass here, but the concept still has to stay recognized at every larger stroke count.");
+    } else if (n >= total && T == null) {
+      setStatus("bad", "Not visible within " + total + " strokes", "The judges never settle on “" + c.word + "”, even with every stroke drawn. " + judgeLine(c, b));
+    } else {
+      setStatus("neutral", "Not yet visible", judgeLine(c, b));
+    }
+
+    // meters
+    var N = c.num_candidates, logN = Math.log10(Math.max(2, N));
+    $("sigRule").textContent = "needs top " + c.rank_cutoff + " of " + N + " words";
+    $("sigTick").style.left = "calc(" + ((1 - Math.log10(Math.max(1, c.rank_cutoff)) / logN) * 100).toFixed(1) + "% - 1px)";
+    if (b && b.siglip_rank != null) {
+      $("sigVal").innerHTML = "#" + b.siglip_rank + " <small>of " + N + "</small>";
+      $("sigFill").style.width = ((1 - Math.log10(Math.max(1, b.siglip_rank)) / logN) * 100).toFixed(1) + "%";
+      $("sigFill").classList.toggle("pass", b.siglip_rank <= c.rank_cutoff);
+    } else {
+      $("sigVal").textContent = "–"; $("sigFill").style.width = "0"; $("sigFill").classList.remove("pass");
+    }
+    if (c.florence_cutoff != null) {
+      $("florRule").textContent = "needs " + c.florence_cutoff.toFixed(2) + " or more";
+      $("florTick").hidden = false;
+      $("florTick").style.left = "calc(" + (c.florence_cutoff * 100).toFixed(1) + "% - 1px)";
+    } else {
+      $("florRule").textContent = "no cutoff set";
+      $("florTick").hidden = true;
+    }
+    if (b && b.florence_score != null) {
+      $("florVal").textContent = b.florence_score.toFixed(2);
+      $("florFill").style.width = (clamp01(b.florence_score) * 100).toFixed(1) + "%";
+      $("florFill").classList.toggle("pass", c.florence_cutoff == null || b.florence_score >= c.florence_cutoff);
+    } else {
+      $("florVal").textContent = b ? "not scored" : "–"; $("florFill").style.width = "0"; $("florFill").classList.remove("pass");
+    }
+
+    $("jumpBtn").disabled = T == null;
+    chart(c, n);
+  }
+
+  function chart(c, n) {
+    var W = 380, H = 210, L = 44, R = 14, Tp = 14, B = 34;
+    var bs = c.budgets, x0 = Math.log2(bs[0].n), x1 = Math.log2(bs[bs.length - 1].n);
+    if (x1 === x0) x1 = x0 + 1;
+    var N = c.num_candidates, logN = Math.log10(Math.max(2, N));
+    var X = function (v) { return L + (Math.log2(v) - x0) / (x1 - x0) * (W - L - R); };
+    var Y = function (r) { return Tp + Math.log10(Math.max(1, Math.min(N, r))) / logN * (H - Tp - B); };
+    var s = "";
+    s += '<rect class="band" x="' + L + '" y="' + Tp + '" width="' + (W - L - R) + '" height="' + (Y(c.rank_cutoff) - Tp).toFixed(1) + '"/>';
+    s += '<text class="band-label" x="' + (W - R - 4) + '" y="' + (Y(c.rank_cutoff) - 5).toFixed(1) + '" text-anchor="end">top ' + c.rank_cutoff + '</text>';
+    var yt = [1, c.rank_cutoff, Math.round(Math.sqrt(N) * 2), N].filter(function (v, i, a) { return v >= 1 && v <= N && a.indexOf(v) === i; });
+    yt.forEach(function (v) {
+      s += '<line class="axis" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '" stroke-opacity="0.6"/>';
+      s += '<text x="' + (L - 6) + '" y="' + (Y(v) + 3.5).toFixed(1) + '" text-anchor="end">#' + v + '</text>';
+    });
+    bs.forEach(function (b) {
+      s += '<text x="' + X(b.n).toFixed(1) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + b.n + '</text>';
+    });
+    s += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 4) + '" text-anchor="middle">strokes drawn</text>';
+    var shown = bs.filter(function (b) { return b.n <= n && b.siglip_rank != null; });
+    if (shown.length > 1) {
+      s += '<polyline class="series" points="' + shown.map(function (b) { return X(b.n).toFixed(1) + "," + Y(b.siglip_rank).toFixed(1); }).join(" ") + '"/>';
+    }
+    if (c.threshold != null && n >= c.threshold) {
+      var tx = X(Math.max(bs[0].n, c.threshold)).toFixed(1);
+      s += '<line class="thr-line" x1="' + tx + '" x2="' + tx + '" y1="' + Tp + '" y2="' + (H - B) + '"/>';
+      s += '<text class="thr-label" x="' + (Number(tx) - 5) + '" y="' + (H - B - 6) + '" text-anchor="end">threshold</text>';
+    }
+    if (n >= bs[0].n && n < bs[bs.length - 1].n) {
+      var px = X(n).toFixed(1);
+      s += '<line class="playhead" x1="' + px + '" x2="' + px + '" y1="' + Tp + '" y2="' + (H - B) + '"/>';
+    }
+    shown.forEach(function (b) {
+      s += '<circle class="pt ' + (isRec(c, b) ? "hit" : "miss") + '" cx="' + X(b.n).toFixed(1) + '" cy="' + Y(b.siglip_rank).toFixed(1) + '" r="5"><title>' + b.n + ' strokes: rank #' + b.siglip_rank + '</title></circle>';
+    });
+    $("chart").innerHTML = s;
+  }
+
+  // ---------- playback ----------
+  function render(force) {
+    paint();
+    var n = Math.floor(pos);
+    if (force || n !== lastShownN) { lastShownN = n; readout(); }
+  }
+  function updateButtons() {
+    var total = cur().strokes.length;
+    $("pauseBtn").textContent = playing ? "Pause" : (pos >= total ? "Play again" : "Resume");
+  }
+  function flash() {
+    var el = $("status");
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  }
+  function tick(ts) {
+    if (!playing) { last = null; return; }
+    if (last == null) last = ts;
+    var dt = Math.min(0.1, (ts - last) / 1000); last = ts;
+    var c = cur(), total = c.strokes.length, T = c.threshold;
+    var next = pos + dt * speed;
+    if (stopAtThreshold && T != null && pos < T && next >= T) { next = T; playing = false; }
+    if (next >= total) { next = total; playing = false; }
+    pos = next;
+    render(false);
+    if (!playing) { updateButtons(); if (pos === T) flash(); }
+    else requestAnimationFrame(tick);
+  }
+  function play() { if (playing) return; playing = true; last = null; updateButtons(); requestAnimationFrame(tick); }
+  function pause() { playing = false; updateButtons(); }
+
+  function buildChips() {
+    var nav = $("concepts"); nav.innerHTML = "";
+    concepts.forEach(function (c, i) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", String(i === idx));
+      var name = document.createElement("span"); name.textContent = c.word;
+      var thr = document.createElement("span"); thr.className = "thr";
+      thr.textContent = c.threshold != null ? c.threshold + " strokes" : "not visible";
+      b.appendChild(name); b.appendChild(thr);
+      b.addEventListener("click", function () { select(i, true); });
+      nav.appendChild(b);
+    });
+  }
+  function select(i, autoplay) {
+    idx = i; pause();
+    Array.prototype.forEach.call($("concepts").children, function (el, k) { el.setAttribute("aria-pressed", String(k === idx)); });
+    pos = 0; render(true); updateButtons();
+    if (autoplay) play();
+  }
+
+  // ---------- controls ----------
+  $("replayBtn").addEventListener("click", function () { pause(); pos = 0; render(true); play(); });
+  $("pauseBtn").addEventListener("click", function () {
+    if (playing) { pause(); return; }
+    if (pos >= cur().strokes.length) pos = 0;
+    play();
+  });
+  $("jumpBtn").addEventListener("click", function () { var T = cur().threshold; if (T == null) return; pause(); pos = T; render(true); flash(); });
+  $("allBtn").addEventListener("click", function () { pause(); pos = cur().strokes.length; render(true); updateButtons(); });
+  $("speedSel").addEventListener("change", function (e) { speed = Number(e.target.value); });
+  $("stopChk").addEventListener("change", function (e) { stopAtThreshold = e.target.checked; });
+
+  $("fileInput").addEventListener("change", function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    var err = $("fileError");
+    f.text().then(function (txt) {
+      var raw = JSON.parse(txt);
+      var list = Array.isArray(raw) ? raw : (Array.isArray(raw.concepts) ? raw.concepts : [raw]);
+      var loaded = list.map(prepare);
+      if (!loaded.length) throw new Error("The file has no concepts in it.");
+      concepts = loaded; usingExamples = false; err.hidden = true;
+      $("dataTag").textContent = "Real runs"; $("dataTag").classList.add("real");
+      $("bannerText").textContent = "Showing " + loaded.length + " concept" + (loaded.length > 1 ? "s" : "") + " from " + f.name + ".";
+      $("restoreBtn").hidden = false;
+      buildChips(); select(0, false); pos = cur().threshold != null ? cur().threshold : cur().strokes.length; render(true); updateButtons();
+    }).catch(function (ex) {
+      err.hidden = false;
+      err.textContent = "Could not load " + f.name + ": " + (ex && ex.message ? ex.message : "the file is not valid JSON.") + " Check it against the file format below.";
+    });
+    e.target.value = "";
+  });
+  $("restoreBtn").addEventListener("click", function () {
+    concepts = examples(); usingExamples = true;
+    $("dataTag").textContent = "Example data"; $("dataTag").classList.remove("real");
+    $("bannerText").textContent = "These drawings and judge scores are hand-made examples to show the idea. Load the JSON exported from Colab to replay real CLIPDraw runs.";
+    $("restoreBtn").hidden = true; $("fileError").hidden = true;
+    buildChips(); select(0, false); pos = cur().threshold; render(true); updateButtons();
+  });
+
+  window.addEventListener("resize", function () { sizeCanvas(); paint(); });
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", function () { paint(); });
+  }
+  new MutationObserver(function () { paint(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // open at rest on the first concept's threshold, so the page shows a finished state
+  buildChips();
+  sizeCanvas();
+  pos = cur().threshold != null ? cur().threshold : cur().strokes.length;
+  render(true);
+  updateButtons();
+})();
+</script>
+</body>
+</html>
