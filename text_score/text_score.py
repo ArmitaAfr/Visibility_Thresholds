@@ -25,23 +25,46 @@ PROBE = ["an image with written words or letters", "an image with no text or let
 SIGLIP = "google/siglip-so400m-patch14-384"
 
 
+# Picks the fastest available device: CUDA GPU, then Apple GPU (MPS), then CPU
+def pick_device(requested="auto"):
+    if requested != "auto":
+        return requested
+
+    if torch.cuda.is_available():
+        return "cuda"
+
+    if torch.backends.mps.is_available():
+        return "mps"
+
+    return "cpu"
+
+
 # Lowercases a string and only keeps a-z
 def letters(s):
     return re.sub(r"[^a-z]", "", s.lower())
 
 
 class Scorer:
-    def __init__(self, upscale=3):
+    def __init__(self, upscale=3, device="auto", half=False):
 
         # Imported here so the models only load when a Scorer is made
         import easyocr
         from transformers import AutoModel, AutoProcessor
 
         self.upscale = upscale
-        self.ocr = easyocr.Reader(["en"], gpu=False, verbose=False)
+        self.device = pick_device(device)
 
-        self.model = AutoModel.from_pretrained(SIGLIP).eval()
+        # fp16 is only used on CUDA; on CPU/MPS it is slower or unsupported for some ops
+        self.dtype = torch.float16 if half and self.device == "cuda" else torch.float32
+
+        # EasyOCR's gpu flag is only used for CUDA, so MPS falls back to CPU for OCR
+        self.ocr = easyocr.Reader(["en"], gpu=self.device == "cuda", verbose=False)
+
+        self.model = AutoModel.from_pretrained(SIGLIP, torch_dtype=self.dtype).to(self.device).eval()
         self.proc = AutoProcessor.from_pretrained(SIGLIP)
+
+        print(f"text_score: SigLIP on {self.device} ({self.dtype}), "
+              f"OCR on {'cuda' if self.device == 'cuda' else 'cpu'}")
 
         # Encode the two probe prompts once, reused for every image
         self.probe = self.text(PROBE)
@@ -51,20 +74,22 @@ class Scorer:
 
         # Encodes a list of prompts with SigLIP
         # Returns normalized embeddings, so a dot product is cosine similarity
-        inputs = self.proc(text=prompts, padding="max_length", return_tensors="pt")
+        inputs = self.proc(text=prompts, padding="max_length", return_tensors="pt").to(self.device)
         features = self.model.get_text_features(**inputs)
 
-        return torch.nn.functional.normalize(features, dim=-1)
+        # Back to fp32 so the similarity math matches the CPU version
+        return torch.nn.functional.normalize(features.float(), dim=-1)
 
     @torch.no_grad()
     def image(self, im):
 
         # Encodes an image with SigLIP
         # Returns a normalized image embedding
-        inputs = self.proc(images=im, return_tensors="pt")
+        inputs = self.proc(images=im, return_tensors="pt").to(self.device)
+        inputs["pixel_values"] = inputs["pixel_values"].to(self.dtype)
         features = self.model.get_image_features(**inputs)
 
-        return torch.nn.functional.normalize(features, dim=-1)
+        return torch.nn.functional.normalize(features.float(), dim=-1)
 
     def read(self, im):
 
@@ -143,7 +168,7 @@ class Scorer:
 
         # SigLIP: how much the image matches "text" vs "no text"
         img = self.image(im)
-        logits = self.model.logit_scale.exp() * img @ self.probe.T + self.model.logit_bias
+        logits = self.model.logit_scale.float().exp() * img @ self.probe.T + self.model.logit_bias.float()
         p_text = float(torch.softmax(logits, -1)[0, 0])
 
         # Does the image look more like the word written out, or a drawing of it?
@@ -258,10 +283,12 @@ def main():
     parser.add_argument("--root", action="append", required=True)  # Repeat to score several parts
     parser.add_argument("--out", default="text_scores.csv")
     parser.add_argument("--upscale", type=int, default=3)
+    parser.add_argument("--device", default="auto", choices=["auto", "cuda", "mps", "cpu"])
+    parser.add_argument("--half", action="store_true")  # fp16 SigLIP, CUDA only; recheck compare.py if used
     args = parser.parse_args()
 
     global _scorer
-    _scorer = Scorer(args.upscale)
+    _scorer = Scorer(args.upscale, args.device, args.half)
 
     rows = []
 

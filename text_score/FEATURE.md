@@ -14,12 +14,14 @@ For each `clipdraw_final.png`, `text_score.py` does three things:
 2. **Asks SigLIP whether the image looks like it has text.** It compares the image with "an image with written words or letters" and "an image with no text or letters". It also checks whether the image looks more like the word written out or like a drawing of it.
 3. **Combines the two.** The result is a 0–4 level (none, scribbles, letters, part of the word, full word) and a 0–1 `text_score`.
 
-It runs after the batch, on the saved images, and needs no GPU.
+It runs after the batch, on the saved images. It uses a GPU if one is available (CUDA for both models, Apple MPS for SigLIP only) and falls back to CPU otherwise.
 
 ## Usage
 
 ```bash
 python3 text_score/text_score.py --root <part folder> [--root <another part>] --out text_scores.csv
 ```
+
+Optional flags: `--device {auto,cuda,mps,cpu}` (default `auto`) and `--half` (fp16 SigLIP on CUDA; faster, but recheck `compare.py` if you use it).
 
 This writes one row per image to `text_scores.csv`. Running `python3 text_score/compare.py` checks the scores against the hand ratings in `human_scores.csv`. 
