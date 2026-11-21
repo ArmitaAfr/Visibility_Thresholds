@@ -76,7 +76,7 @@ def build(combined_csv, strokes_root, rank_cutoff=1):
             "num_candidates": 150,
             "florence_cutoff": None,          # shown, but not part of the threshold rule
             "data_label": "Real run: strokes pruned from a 256-stroke CLIPDraw drawing",
-            "strokes": [{k: s[k] for k in ("points", "width", "color")} for s in record["strokes"]],
+            "strokes": [{k: s[k] for k in ("points", "width", "color", "index") if k in s} for s in record["strokes"]],
             "budgets": budgets,
         })
     return out

@@ -125,11 +125,13 @@ def export_budgets(part_folders, clip_model, out_root, limit=None, budgets=BUDGE
     out_root = Path(out_root)
     done = 0
     for part_folder in part_folders:
+        if limit is not None and done >= limit:
+            break
         part_folder = Path(part_folder)
         part = part_folder.name
         for folder, word, svg, info in find_drawings(part_folder):
             if limit is not None and done >= limit:
-                return
+                break
             stroke_file = out_root / "strokes" / part / f"{folder.name}.json"
             if stroke_file.exists():          # resume: this word is finished
                 print(f"{part}/{folder.name}: already exported, skipping")
@@ -148,7 +150,8 @@ def export_budgets(part_folders, clip_model, out_root, limit=None, budgets=BUDGE
                 n = min(n, len(order))
                 dest = out_root / f"b{n:03d}" / part / folder.name
                 dest.mkdir(parents=True, exist_ok=True)
-                img = render_hwc(shapes, groups, order[:n], seed=render_seed)
+                # importance picks WHICH strokes; drawing keeps the original layering (index order)
+                img = render_hwc(shapes, groups, sorted(order[:n]), seed=render_seed)
                 pydiffvg.imwrite(img.detach().cpu(), str(dest / "clipdraw_final.png"), gamma=1.0)
                 meta = {
                     "project": info.get("project"),
@@ -178,6 +181,7 @@ def export_budgets(part_folders, clip_model, out_root, limit=None, budgets=BUDGE
                     "width": round(float(shapes[i].stroke_width.detach().cpu().reshape(-1)[0]), 2),
                     "color": [round(float(c), 3) for c in groups[i].stroke_color.detach().cpu().clamp(0, 1).tolist()],
                     "score_drop": round(drops[i], 5),
+                    "index": i,                     # original paint order
                 })
             stroke_file.parent.mkdir(parents=True, exist_ok=True)
             stroke_file.write_text(json.dumps({

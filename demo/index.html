@@ -605,7 +605,7 @@ pre {
     var strokes = c.strokes.map(function (s) {
       var col = (s.color || [0, 0, 0, 1]).map(Number);
       if (col.length === 3) col.push(1);
-      return { pts: cleanPoints(s.points || []), width: Number(s.width) || 2, color: col };
+      return { pts: cleanPoints(s.points || []), width: Number(s.width) || 2, color: col, index: s.index == null ? null : Number(s.index) };
     }).filter(function (s) { return s.pts.length >= 4; });
     var budgets = c.budgets.map(function (b) {
       return {
@@ -699,7 +699,11 @@ pre {
     ctx.setTransform(sc, 0, 0, sc, 0, 0);
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     var full = Math.floor(pos), n = c.strokes.length;
-    for (var i = 0; i < Math.min(full, n); i++) strokePath(c.strokes[i], 1);
+    // Strokes appear in importance order but are layered in their original paint order (index).
+    var shown = c.strokes.slice(0, Math.min(full, n)).slice().sort(function (a, b) {
+      return (a.index == null || b.index == null) ? 0 : a.index - b.index;
+    });
+    for (var i = 0; i < shown.length; i++) strokePath(shown[i], 1);
     if (!reduceMotion && full < n && pos - full > 0.02) strokePath(c.strokes[full], pos - full);
   }
 
