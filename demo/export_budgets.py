@@ -153,10 +153,13 @@ def export_budgets(part_folders, clip_model, out_root, limit=None, budgets=BUDGE
                 # importance picks WHICH strokes; drawing keeps the original layering (index order)
                 img = render_hwc(shapes, groups, sorted(order[:n]), seed=render_seed)
                 pydiffvg.imwrite(img.detach().cpu(), str(dest / "clipdraw_final.png"), gamma=1.0)
+                # No "project"/"run_mode" keys: the evaluation notebook treats records with
+                # those as raw CLIPDraw output and demands the generation files (SVG, loss
+                # history). These images are derived from that output, so say so instead.
                 meta = {
-                    "project": info.get("project"),
+                    "derivation": "stroke_prune",
+                    "source_project": info.get("project"),
                     "substrate": info.get("substrate", "vector strokes"),
-                    "run_mode": "stroke_prune",
                     "word": word,
                     "prompt": prompt,
                     "stroke_budget": n,
