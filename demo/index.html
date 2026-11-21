@@ -877,19 +877,23 @@ pre {
   $("speedSel").addEventListener("change", function (e) { speed = Number(e.target.value); });
   $("stopChk").addEventListener("change", function (e) { stopAtThreshold = e.target.checked; });
 
+  function useReal(raw, source) {
+    var list = Array.isArray(raw) ? raw : (Array.isArray(raw.concepts) ? raw.concepts : [raw]);
+    var loaded = list.map(prepare);
+    if (!loaded.length) throw new Error("The file has no concepts in it.");
+    concepts = loaded; usingExamples = false;
+    $("dataTag").textContent = "Real runs · pruned strokes"; $("dataTag").classList.add("real");
+    $("bannerText").textContent = "Showing " + loaded.length + " concept" + (loaded.length > 1 ? "s" : "") + " from " + source + ". Strokes are pruned from finished 256-stroke CLIPDraw drawings and judged by SigLIP2, Florence-2 and the text score.";
+    $("restoreBtn").hidden = false;
+    buildChips(); select(0, false); pos = cur().threshold != null ? cur().threshold : cur().strokes.length; render(true); updateButtons();
+  }
+
   $("fileInput").addEventListener("change", function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
     var err = $("fileError");
     f.text().then(function (txt) {
-      var raw = JSON.parse(txt);
-      var list = Array.isArray(raw) ? raw : (Array.isArray(raw.concepts) ? raw.concepts : [raw]);
-      var loaded = list.map(prepare);
-      if (!loaded.length) throw new Error("The file has no concepts in it.");
-      concepts = loaded; usingExamples = false; err.hidden = true;
-      $("dataTag").textContent = "Real runs · pruned strokes"; $("dataTag").classList.add("real");
-      $("bannerText").textContent = "Showing " + loaded.length + " concept" + (loaded.length > 1 ? "s" : "") + " from " + f.name + ".";
-      $("restoreBtn").hidden = false;
-      buildChips(); select(0, false); pos = cur().threshold != null ? cur().threshold : cur().strokes.length; render(true); updateButtons();
+      useReal(JSON.parse(txt), f.name);
+      err.hidden = true;
     }).catch(function (ex) {
       err.hidden = false;
       err.textContent = "Could not load " + f.name + ": " + (ex && ex.message ? ex.message : "the file is not valid JSON.") + " Check it against the file format below.";
@@ -917,6 +921,17 @@ pre {
   pos = cur().threshold != null ? cur().threshold : cur().strokes.length;
   render(true);
   updateButtons();
+
+  // Optional: results baked into the page (<script id="preloaded" type="application/json">)
+  // or a results file published next to the page (<script id="preloaded" data-src="results.json">)
+  var pre = document.getElementById("preloaded");
+  function preFail(ex) { $("fileError").hidden = false; $("fileError").textContent = "Bundled results could not be loaded: " + (ex && ex.message ? ex.message : ex); }
+  if (pre && pre.dataset.src) {
+    fetch(pre.dataset.src).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (raw) { useReal(raw, pre.dataset.source || pre.dataset.src); }).catch(preFail);
+  } else if (pre && pre.textContent.trim()) {
+    try { useReal(JSON.parse(pre.textContent), pre.dataset.source || "the bundled results"); } catch (ex) { preFail(ex); }
+  }
 })();
 </script>
 </body>
