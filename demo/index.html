@@ -338,7 +338,7 @@ pre {
   <header>
     <p class="eyebrow">QMIND · Visibility Thresholds · midpoint demo</p>
     <h1>How many strokes does a concept need?</h1>
-    <p class="lede">A CLIPDraw drawing is replayed one stroke at a time, most important stroke first. At 8, 16, 32, 64, 128 and 256 strokes, two independent judges (SigLIP and Florence) check whether they can recognize the concept. Its visibility threshold is the first stroke count where it is recognized and stays recognized at every larger count.</p>
+    <p class="lede">A CLIPDraw drawing is replayed one stroke at a time, most important stroke first. At 8, 16, 32, 64, 128 and 256 strokes, SigLIP checks whether it picks the right word, and Florence describes what it sees. Its visibility threshold is the first stroke count where SigLIP recognizes it and keeps recognizing it at every larger count.</p>
   </header>
 
   <div class="banner" id="banner">
@@ -402,7 +402,7 @@ pre {
       <div class="panel chart-panel">
         <h3>SigLIP rank at each checkpoint</h3>
         <div class="chart-box"><svg id="chart" viewBox="0 0 380 210" role="img" aria-label="SigLIP rank of the target word by stroke count"></svg></div>
-        <p class="note">Rank 1 means SigLIP picked the target word over every distractor. Green dots passed both judges.</p>
+        <p class="note">Rank 1 means SigLIP picked the target word over every distractor. Green dots passed the threshold rule.</p>
       </div>
     </section>
   </main>
@@ -612,6 +612,8 @@ pre {
         n: Number(b.n),
         siglip_rank: b.siglip_rank == null ? null : Number(b.siglip_rank),
         florence_score: b.florence_score == null ? null : Number(b.florence_score),
+        caption: typeof b.caption === "string" ? b.caption : null,
+        text_score: b.text_score == null ? null : Number(b.text_score),
         recognized: typeof b.recognized === "boolean" ? b.recognized : null
       };
     }).sort(function (a, b) { return a.n - b.n; });
@@ -716,7 +718,9 @@ pre {
   function judgeLine(c, b) {
     var parts = [];
     if (b.siglip_rank != null) parts.push("SigLIP ranks “" + c.word + "” #" + b.siglip_rank + " of " + c.num_candidates);
-    if (b.florence_score != null) parts.push("Florence match " + b.florence_score.toFixed(2));
+    if (b.caption != null) parts.push("Florence sees: “" + b.caption + "”");
+    else if (b.florence_score != null) parts.push("Florence match " + b.florence_score.toFixed(2));
+    if (b.text_score != null) parts.push("text score " + b.text_score.toFixed(2));
     return parts.join(" · ") + " (checked at " + b.n + " strokes).";
   }
   function readout() {
@@ -731,7 +735,7 @@ pre {
     } else if (T != null && n >= T) {
       setStatus("ok", "Visible at " + T + " strokes", judgeLine(c, b));
     } else if (isRec(c, b)) {
-      setStatus("warn", "Recognized at " + b.n + ", not yet stable", "Both judges pass here, but the concept still has to stay recognized at every larger stroke count.");
+      setStatus("warn", "Recognized at " + b.n + ", not yet stable", "The judges pass here, but the concept still has to stay recognized at every larger stroke count.");
     } else if (n >= total && T == null) {
       setStatus("bad", "Not visible within " + total + " strokes", "The judges never settle on “" + c.word + "”, even with every stroke drawn. " + judgeLine(c, b));
     } else {
@@ -754,11 +758,11 @@ pre {
       $("florTick").hidden = false;
       $("florTick").style.left = "calc(" + (c.florence_cutoff * 100).toFixed(1) + "% - 1px)";
     } else {
-      $("florRule").textContent = "no cutoff set";
+      $("florRule").textContent = "shown only, not part of the threshold";
       $("florTick").hidden = true;
     }
     if (b && b.florence_score != null) {
-      $("florVal").textContent = b.florence_score.toFixed(2);
+      $("florVal").textContent = b.caption != null ? (b.florence_score >= 0.5 ? "names it" : "doesn't name it") : b.florence_score.toFixed(2);
       $("florFill").style.width = (clamp01(b.florence_score) * 100).toFixed(1) + "%";
       $("florFill").classList.toggle("pass", c.florence_cutoff == null || b.florence_score >= c.florence_cutoff);
     } else {
@@ -878,7 +882,7 @@ pre {
       var loaded = list.map(prepare);
       if (!loaded.length) throw new Error("The file has no concepts in it.");
       concepts = loaded; usingExamples = false; err.hidden = true;
-      $("dataTag").textContent = "Real runs"; $("dataTag").classList.add("real");
+      $("dataTag").textContent = "Real runs · pruned strokes"; $("dataTag").classList.add("real");
       $("bannerText").textContent = "Showing " + loaded.length + " concept" + (loaded.length > 1 ? "s" : "") + " from " + f.name + ".";
       $("restoreBtn").hidden = false;
       buildChips(); select(0, false); pos = cur().threshold != null ? cur().threshold : cur().strokes.length; render(true); updateButtons();
