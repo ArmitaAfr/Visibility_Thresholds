@@ -88,6 +88,40 @@ python3 clipag_cohort/compare.py \
 python3 clipag_cohort/compare.py <prod150 combined.csv> <clip150ctl combined.csv> --labels prod150 CLIP-rerun
 ```
 
+## Pixel runs (`clipag_pixels.ipynb`)
+
+Makes one image per word by optimizing pixels directly against the guidance model, with no strokes. Together with the stroke runs this gives a 2×2 design:
+
+| | Strokes | Pixels |
+|---|---|---|
+| **CLIP** | `prod150_v1` | `clip150px_v1` |
+| **CLIPAG** | `clipag150_v1` | `clipag150px_v1` |
+
+**Recipe:** from the CLIPAG authors' `CLIPAG_T2I.ipynb` (`generate()`). Raw 224×224 pixels, AdamW at lr 0.0175, 100 steps. Each step scores 32 noisy, DiffAugmented whole-image views and 32 random 128 px crops resized to 224. Loss = mean(1 − cos) on views + 5 × mean(1 − cos) on crops, with CLIP normalization, gradient-norm clip 0.001, and dynamic thresholding at p = 0.95. The image with the lowest whole-view loss is kept. Every value is in `pixels.RECIPE` and is saved in each `experiment.json`.
+
+**Where it differs from the authors**, so the runs stay paired:
+- **Start image:** uniform noise × 0.05 with seed 0, the same for every word and both models. This is the authors' commented-out option. Their default picks a different start per prompt from a Tiny-ImageNet mixture model.
+- **Prompt:** `A drawing of {word}.`, not a raw caption.
+- **DiffAugment** is re-implemented from the notebook's parameters, not copied, and the resize step uses one scale per batch.
+
+The authors' paper says 1,000 steps but their notebook uses 100. This uses the notebook.
+
+**Expectations:** standard CLIP is expected to give noise-like images it scores highly but people can't read (the reason CLIPDraw uses strokes). If SigLIP2 still "recognizes" them, the judge is fooled by the same kind of shortcut as the generator. `CHECKPOINT_LOCATION="colab"` keeps the 1.3 GB checkpoint off Drive (it re-downloads each session). No DiffVG is needed.
+
+**Loss values are not comparable across substrates.** Strokes record the summed negative cosine over 4 views; pixels record mean(1 − cos).
+
+## Synthesis (`clipag_synthesis.ipynb`)
+
+Collects every condition into `ExperimentResults/synthesis/<OUTPUT_NAME>/` and runs on CPU. It writes:
+- `images/<condition>/<word>.png` and `metadata/`
+- `index.csv`, with one row per image and judge results matched by PNG SHA-256
+- `wide.csv`, with one row per word
+- per-word and per-group image grids
+- `judge_input/`, to judge every condition in one judge run
+- `SUMMARY.md` and `summary.json`, with completeness, top-1 by group, and the paired comparisons from `compare.py`
+
+Conditions that don't exist yet are skipped. Run it once to collect, judge the new runs, then run it again with their `combined.csv` files listed in `JUDGE_CSVS`.
+
 ## Limits
 
 - **The judge is still a CLIP-family model.** SigLIP2 may favour whichever guidance model is closer to it. Human judges remain the test that matters.
@@ -98,7 +132,11 @@ python3 clipag_cohort/compare.py <prod150 combined.csv> <clip150ctl combined.csv
 
 | File | Purpose |
 |---|---|
-| `../clipag_cohort.ipynb` | Colab driver; reuses the setup, guidance, optimizer and export cells of `clipdraw_clipag.ipynb` |
-| `cohort.py` | Word list, team split, resume checks, prod150-compatible `experiment.json`, atomic publish |
-| `compare.py` | Paired analysis of two `combined.csv` files |
-| `tests/test_cohort.py` | Local tests, no GPU: `PROD150_COMBINED=<combined.csv> python3 -m unittest discover -s clipag_cohort/tests -t .` |
+| `../clipag_cohort.ipynb` | Stroke runs; reuses the setup, guidance, optimizer and export cells of `clipdraw_clipag.ipynb` |
+| `../clipag_pixels.ipynb` | Pixel runs; reuses only the guidance-loading cell (no DiffVG) |
+| `../clipag_synthesis.ipynb` | Collects all runs into one folder (CPU) |
+| `cohort.py` | Word list, team split, resume checks, `experiment.json` records, atomic publish |
+| `pixels.py` | Pixel optimizer (CLIPAG authors' recipe) |
+| `compare.py` | Paired analysis of two judged runs |
+| `synthesize.py` | Index, judge merge, grids, summary |
+| `tests/` | Local tests, no GPU: `PROD150_COMBINED=<combined.csv> python3 -m unittest discover -s clipag_cohort/tests -t .` |

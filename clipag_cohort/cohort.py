@@ -115,6 +115,51 @@ def run_settings(*, run_id, guidance_model, run_mode, subset, people):
             "words_commit": SAMPLED_WORDS_COMMIT, "words_sha256": SAMPLED_WORDS_SHA256}
 
 
+def pixel_settings(*, run_id, guidance_model, run_mode, subset, people, recipe):
+    """Run settings for a pixel-optimization run. Stroke settings are left unchanged."""
+    settings = run_settings(run_id=run_id, guidance_model=guidance_model, run_mode=run_mode,
+                            subset=subset, people=people)
+    settings.update(substrate="pixels", pixel_recipe=dict(recipe))
+    return settings
+
+
+def pixel_record(*, word_row, index, settings, person, source_commit, prompt, seed, effective,
+                 guidance, environment, elapsed_seconds, best_step, best_global_loss, steps_run):
+    """experiment.json for one pixel-optimization result (judge-pipeline compatible)."""
+    if prompt != PROD150["prompt_template"].format(word_row["word"]) or seed != PROD150["seed"]:
+        raise ValueError("Prompt or seed differs from prod150.")
+    if guidance["guidance_model"] != settings["guidance_model"] or settings.get("substrate") != "pixels":
+        raise ValueError("Guidance model or substrate differs from the run settings.")
+    return {
+        "project": "Visibility Thresholds: The Shape a Thought Needs",
+        "substrate": "pixels",
+        "experiment_mode": "cohort",
+        "run_mode": settings["run_mode"],
+        "word": word_row["word"],
+        "prompt": prompt,
+        "prompt_template": PROD150["prompt_template"],
+        "seed": seed,
+        "pixel_recipe": settings["pixel_recipe"],
+        "effective": dict(effective),
+        "guidance": guidance,
+        "environment": environment,
+        "elapsed_seconds": elapsed_seconds,
+        "steps_run": steps_run,
+        "best_step": best_step,
+        "final_loss": best_global_loss,
+        "final_loss_definition": "lowest global loss (mean 1 - cosine over augmented whole-image views)",
+        "loss_history_file": "loss_history.json",
+        "cohort": {"run_id": settings["run_id"], "guidance_model": settings["guidance_model"],
+                   "substrate": "pixels", "subset": settings["subset"], "person": person,
+                   "num_people": settings["num_people"], "index_in_part": index,
+                   "imageability_group": word_row["group"],
+                   "glasgow_imageability_mean": word_row["imageability"],
+                   "words_commit": SAMPLED_WORDS_COMMIT, "words_sha256": SAMPLED_WORDS_SHA256,
+                   "source_commit": source_commit},
+        "paired_baseline": dict(PROD150),
+    }
+
+
 def check_or_write_json(path, payload):
     """Write payload once; later sessions must find the identical payload."""
     path = Path(path)
@@ -131,7 +176,7 @@ def check_or_write_json(path, payload):
     return True
 
 
-def plan_part(words, part_dir, guidance_model):
+def plan_part(words, part_dir, guidance_model, substrate=None):
     """Return [(index, word_row, folder, done)] for one person's part.
 
     A folder counts as done only if it holds experiment.json and a nonempty PNG
@@ -153,6 +198,8 @@ def plan_part(words, part_dir, guidance_model):
             _, w = expected[child.name]
             if info.get("word") != w["word"] or info.get("cohort", {}).get("guidance_model") != guidance_model:
                 raise ValueError(f"Result folder does not match this run: {child}")
+            if substrate is not None and info.get("substrate") != substrate:
+                raise ValueError(f"Result folder has a different substrate: {child}")
     return [(i, w, part_dir / name, (part_dir / name / "experiment.json").is_file())
             for name, (i, w) in expected.items()]
 

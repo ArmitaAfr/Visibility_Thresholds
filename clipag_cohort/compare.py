@@ -25,10 +25,16 @@ NEEDED = ["target_word", "imageability_group", "glasgow_imageability_mean", "sig
 
 
 def load(path):
-    df = pd.read_csv(path)
+    return prepare(pd.read_csv(path), str(path))
+
+
+def prepare(df, name="table"):
+    """Index judged rows by word and add the 0/1 outcome columns."""
+    df = df.copy()
     missing = [c for c in NEEDED if c not in df.columns]
     if missing:
-        raise ValueError(f"{path} lacks columns {missing}; is it an analysis/combined.csv?")
+        raise ValueError(f"{name} lacks columns {missing}; is it an analysis/combined.csv?")
+    path = name
     df["target_word"] = df["target_word"].str.strip().str.lower()
     if df["target_word"].duplicated().any():
         raise ValueError(f"{path} has more than one image for some words; pairing needs one per word.")
